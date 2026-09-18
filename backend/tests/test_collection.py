@@ -19,7 +19,7 @@ from tests.conftest import suggest_body
 def make_settings(**overrides) -> Settings:
     base = dict(
         ADMIN_PASSWORD="pw",
-        GEMINI_API_KEY="key",
+        ANTHROPIC_API_KEY="key",
         SUGGEST_DELAY_SECONDS=0.0,
         SUGGEST_TIMEOUT_SECONDS=1.0,
         SUGGEST_MAX_RETRIES=1,

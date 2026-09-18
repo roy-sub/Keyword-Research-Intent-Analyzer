@@ -48,10 +48,19 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = ""
 
     # ---- AI ---------------------------------------------------------------
+    # Providers are tried in this order; the first that returns a report wins.
+    AI_PROVIDER_ORDER: str = "anthropic,openai,gemini"
+    AI_TIMEOUT_SECONDS: float = 120.0
+    MAX_KEYWORDS_IN_PROMPT: int = 600
+
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_MODEL: str = "claude-opus-5"
+
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-6-astra"
+
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.5-flash"
-    GEMINI_TIMEOUT_SECONDS: float = 120.0
-    MAX_KEYWORDS_IN_PROMPT: int = 600
 
     # ---- Collection -------------------------------------------------------
     SUGGEST_LANG: str = "en"
@@ -107,6 +116,27 @@ class Settings(BaseSettings):
         return [m.strip() for m in self.SUGGEST_COMMERCIAL_MODIFIERS.split(",") if m.strip()]
 
     @property
+    def provider_order(self) -> list[str]:
+        """Provider names to try, in order, de-duplicated and validated."""
+        known = {"anthropic", "openai", "gemini"}
+        order: list[str] = []
+        for raw in self.AI_PROVIDER_ORDER.split(","):
+            name = raw.strip().lower()
+            if name in known and name not in order:
+                order.append(name)
+        return order
+
+    @property
+    def configured_providers(self) -> list[str]:
+        """Provider names in the order that also have an API key set."""
+        keys = {
+            "anthropic": self.ANTHROPIC_API_KEY,
+            "openai": self.OPENAI_API_KEY,
+            "gemini": self.GEMINI_API_KEY,
+        }
+        return [n for n in self.provider_order if keys[n].strip()]
+
+    @property
     def expected_queries(self) -> int:
         """Seed + a-z + question modifiers + commercial modifiers."""
         return 1 + len(ALPHABET) + len(self.question_modifiers) + len(self.commercial_modifiers)
@@ -122,7 +152,9 @@ class Settings(BaseSettings):
         per_query = self.SUGGEST_DELAY_SECONDS + self.SUGGEST_TIMEOUT_SECONDS * (
             self.SUGGEST_MAX_RETRIES + 1
         )
-        return per_query * self.expected_queries + self.GEMINI_TIMEOUT_SECONDS * 2 + 30.0
+        # Worst case the whole provider chain is attempted before one succeeds.
+        ai_budget = self.AI_TIMEOUT_SECONDS * max(1, len(self.provider_order))
+        return per_query * self.expected_queries + ai_budget + 30.0
 
     @property
     def cors_origins(self) -> list[str]:
@@ -157,8 +189,11 @@ class Settings(BaseSettings):
         missing: list[str] = []
         if not self.ADMIN_PASSWORD.strip():
             missing.append("ADMIN_PASSWORD")
-        if not self.GEMINI_API_KEY.strip():
-            missing.append("GEMINI_API_KEY")
+        if not self.configured_providers:
+            missing.append(
+                "at least one AI provider key "
+                "(ANTHROPIC_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY)"
+            )
         if self.is_prod:
             if not self.API_KEY.strip():
                 missing.append("API_KEY (required when MODE=prod)")
@@ -195,5 +230,8 @@ def configure_logging(settings: Settings) -> None:
         else "%(asctime)s %(levelname)s %(message)s"
     )
     logging.basicConfig(level=level, format=fmt, force=True)
+    # google-genai logs an advisory about automatic function calling on every
+    # generate_content call. We pass no tools, so it is pure noise.
+    logging.getLogger("google_genai.models").setLevel(logging.ERROR)
     if settings.is_prod:
         logging.getLogger("httpx").setLevel(logging.WARNING)

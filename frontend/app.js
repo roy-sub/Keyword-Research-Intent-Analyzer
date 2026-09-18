@@ -31,6 +31,14 @@
 
   const TYPE_ORDER = ["seed", "alphabet", "question", "commercial"];
 
+  /* Display names for the AI providers the backend can fall back through.
+     The backend sends a stable id; the wording lives here. */
+  const PROVIDER_NAMES = {
+    anthropic: "Claude",
+    openai: "OpenAI",
+    gemini: "Gemini"
+  };
+
   const state = {
     accessKey: null,
     mockMode: false,
@@ -182,6 +190,11 @@
     panelRaw: $("panel-raw"),
 
     copyReportBtn: $("copy-report-btn"),
+    reportAttrib: $("report-attrib"),
+    attribDot: $("attrib-dot"),
+    attribProvider: $("attrib-provider"),
+    attribModel: $("attrib-model"),
+    errorProviders: $("error-providers"),
     reportBody: $("report-body"),
     reportNav: $("report-nav"),
     reportToc: $("report-toc"),
@@ -594,6 +607,8 @@
       el.errorActionBtn.onclick = null;
     }
 
+    renderProviderFailures(options.providerFailures);
+
     if (typeof options.countdownSeconds === "number" && options.countdownSeconds > 0) {
       el.errorCountdown.classList.remove("is-hidden");
       const total = options.countdownSeconds;
@@ -616,6 +631,47 @@
     } else {
       el.errorCountdown.classList.add("is-hidden");
     }
+  }
+
+  /* One line per provider: who was tried, on which model, and why it could
+     not answer. Reasons come from the backend already sanitised. */
+  function renderProviderFailures(failures) {
+    el.errorProviders.innerHTML = "";
+    if (!Array.isArray(failures) || !failures.length) {
+      el.errorProviders.classList.add("is-hidden");
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    failures.forEach((f) => {
+      const li = document.createElement("li");
+      li.className = "failure";
+
+      const dot = document.createElement("span");
+      dot.className = "failure__dot" + (f.provider ? " attrib__dot--" + f.provider : "");
+
+      const name = document.createElement("span");
+      name.className = "failure__name";
+      name.textContent = f.label || PROVIDER_NAMES[f.provider] || f.provider || "Provider";
+
+      li.appendChild(dot);
+      li.appendChild(name);
+
+      if (f.model) {
+        const model = document.createElement("span");
+        model.className = "failure__model";
+        model.textContent = f.model;
+        li.appendChild(model);
+      }
+
+      const reason = document.createElement("span");
+      reason.className = "failure__reason";
+      reason.textContent = f.reason || "Failed for an unknown reason.";
+      li.appendChild(reason);
+
+      frag.appendChild(li);
+    });
+    el.errorProviders.appendChild(frag);
+    el.errorProviders.classList.remove("is-hidden");
   }
 
   function showNote(message) {
@@ -677,6 +733,7 @@
     }
 
     el.tabRawCount.textContent = String(data.total_keywords);
+    renderAttribution(data);
     renderReportTab(data.analysis_markdown);
 
     state.filterText = "";
@@ -755,6 +812,24 @@
   }
 
   let tocObserver = null;
+
+  /* Say which model actually wrote this report. The backend tries several
+     providers in order, so this is not always the first-choice one. */
+  function renderAttribution(data) {
+    const provider = data.analysis_provider || "";
+    const model = data.analysis_model || "";
+    if (!provider && !model) {
+      el.reportAttrib.classList.add("is-hidden");
+      return;
+    }
+    el.reportAttrib.classList.remove("is-hidden");
+    const name = PROVIDER_NAMES[provider] || provider;
+    el.attribProvider.textContent = name;
+    el.attribModel.textContent = model;
+    el.attribModel.classList.toggle("is-hidden", !model);
+    el.attribDot.className = "attrib__dot" + (provider ? " attrib__dot--" + provider : "");
+    el.reportAttrib.title = model ? `${name} · ${model}` : name;
+  }
 
   function renderReportTab(markdown) {
     if (!librariesAvailable()) {
@@ -1117,7 +1192,20 @@
       }
 
       case 502:
-      case 504:
+      case 504: {
+        const failures = err.body && err.body.provider_failures;
+        if (Array.isArray(failures) && failures.length) {
+          showError({
+            title: "The AI analysis could not be completed",
+            message:
+              "Every configured AI provider was tried and none could produce a " +
+              "report. The keyword data was collected successfully.",
+            providerFailures: failures,
+            actionLabel: "Try again",
+            onAction: () => runAnalysis(topic)
+          });
+          break;
+        }
         showError({
           title: err.status === 504 ? "The run timed out" : "The run failed",
           message: detail || "Something went wrong on the server.",
@@ -1125,6 +1213,7 @@
           onAction: () => runAnalysis(topic)
         });
         break;
+      }
 
       default:
         showError({

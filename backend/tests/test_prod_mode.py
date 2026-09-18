@@ -20,7 +20,7 @@ def prod_settings(**overrides) -> Settings:
         MODE="prod",
         ADMIN_USERNAME="admin",
         ADMIN_PASSWORD="test-password",
-        GEMINI_API_KEY="key",
+        ANTHROPIC_API_KEY="key",
         API_KEY="super-secret-api-key",
         ALLOWED_ORIGINS=PROD_ORIGIN,
         SUGGEST_DELAY_SECONDS=0.0,
@@ -235,7 +235,7 @@ def test_health_is_open_in_prod(prod_client):
 
 
 def test_missing_admin_password_fails_validation():
-    settings = Settings(ADMIN_PASSWORD="", GEMINI_API_KEY="key")
+    settings = Settings(ADMIN_PASSWORD="", ANTHROPIC_API_KEY="key")
     assert settings.missing_required() == ["ADMIN_PASSWORD"]
     with pytest.raises(ConfigError) as excinfo:
         settings.validate_or_raise()
@@ -244,7 +244,7 @@ def test_missing_admin_password_fails_validation():
 
 def test_prod_requires_api_key_and_allowed_origins():
     settings = Settings(
-        MODE="prod", ADMIN_PASSWORD="pw", GEMINI_API_KEY="key", API_KEY="", ALLOWED_ORIGINS=""
+        MODE="prod", ADMIN_PASSWORD="pw", ANTHROPIC_API_KEY="key", API_KEY="", ALLOWED_ORIGINS=""
     )
     missing = settings.missing_required()
     assert any("API_KEY" in m for m in missing)
@@ -253,7 +253,7 @@ def test_prod_requires_api_key_and_allowed_origins():
 
 def test_dev_mode_allows_any_origin():
     """Dev must not reject a preflight over which local host name was typed."""
-    settings = Settings(ADMIN_PASSWORD="pw", GEMINI_API_KEY="key")
+    settings = Settings(ADMIN_PASSWORD="pw", ANTHROPIC_API_KEY="key")
     assert not settings.is_prod
     assert settings.cors_origins == ["*"]
 

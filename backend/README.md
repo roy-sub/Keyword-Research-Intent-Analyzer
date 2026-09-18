@@ -17,7 +17,7 @@ cross-origin and `ALLOWED_ORIGINS` is load-bearing. See the
 From this `backend/` folder:
 
 ```bash
-cp .env.example .env     # then set ADMIN_PASSWORD and GEMINI_API_KEY
+cp .env.example .env     # then set ADMIN_PASSWORD + at least one AI key
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -26,9 +26,9 @@ The API is then at **http://localhost:8000**, with interactive docs at
 **http://localhost:8000/docs** (dev only).
 
 `.env.example` documents every variable with a comment and a safe default.
-Only `ADMIN_PASSWORD` and `GEMINI_API_KEY` have no default and must be filled
-in — startup fails with a clear message naming any required variable that is
-missing.
+Only `ADMIN_PASSWORD` and at least one AI provider key have no default and
+must be filled in — startup fails with a clear message naming any required
+variable that is missing.
 
 To use the UI as well, start the frontend in a second terminal — see
 [frontend/README.md](../frontend/README.md).
@@ -39,7 +39,7 @@ To use the UI as well, start the frontend in a second terminal — see
 ./.venv/bin/python -m pytest
 ```
 
-66 tests. All HTTP is mocked; nothing touches Google or Gemini, and no test
+92 tests. All HTTP is mocked; nothing touches Google or Gemini, and no test
 needs real credentials.
 
 Smoke-testing a running server by hand:
@@ -77,7 +77,7 @@ backend/
     rate_limit.py     global sliding-window search quota
     cache.py          TTL + LRU cache
     models.py         request/response models (the API contract)
-    analysis.py       Gemini client and prompt
+    analysis.py       prompt, the three providers, and the fallback chain
     suggest/
       base.py         SuggestProvider protocol, query set, dedupe, merge
       google.py       GoogleSuggestProvider
@@ -106,7 +106,7 @@ All read through `pydantic-settings` from the environment, falling back to
 | `X-API-Key` | not enforced | required for callers outside `ALLOWED_ORIGINS` |
 | `/docs`, `/redoc`, `/openapi.json` | enabled | disabled (404) |
 | Logs | verbose, with module and line | concise |
-| Startup validation | `ADMIN_PASSWORD`, `GEMINI_API_KEY` | those plus `API_KEY`, `ALLOWED_ORIGINS` |
+| Startup validation | `ADMIN_PASSWORD`, one AI key | those plus `API_KEY`, `ALLOWED_ORIGINS` |
 
 Dev needs no CORS configuration: **any** origin is accepted, so it does
 not matter whether you open the UI at `localhost`, `127.0.0.1`, `0.0.0.0`,
@@ -130,12 +130,32 @@ so it can be wired straight from Render's `fromService: property: host`.
 
 ### AI
 
+Three providers, tried in order. The first that returns a report wins; any
+failure falls through to the next. **At least one key is required** — startup
+fails if all three are empty. An unset provider is skipped, not an error.
+
 | Variable | Default | Purpose |
 |---|---|---|
-| `GEMINI_API_KEY` | **required** | No default. From https://aistudio.google.com/apikey |
-| `GEMINI_MODEL` | `gemini-3.5-flash` | Model used for the report. |
-| `GEMINI_TIMEOUT_SECONDS` | `120` | Per-call timeout. |
+| `AI_PROVIDER_ORDER` | `anthropic,openai,gemini` | Order to try. Unknown names are ignored. |
+| `AI_TIMEOUT_SECONDS` | `120` | Per-attempt timeout, applied to each provider separately. |
 | `MAX_KEYWORDS_IN_PROMPT` | `600` | Prompt cap; truncation is noted in the prompt itself. |
+| `ANTHROPIC_API_KEY` | — | Claude. https://console.anthropic.com/settings/keys |
+| `ANTHROPIC_MODEL` | `claude-opus-5` | Flagship. Cheaper: `claude-sonnet-5`, `claude-haiku-4-5`. |
+| `OPENAI_API_KEY` | — | OpenAI. https://platform.openai.com/api-keys |
+| `OPENAI_MODEL` | `gpt-6-astra` | Flagship. Cheaper: `gpt-5.6-terra`, `gpt-5.6-luna`. |
+| `GEMINI_API_KEY` | — | Gemini. https://aistudio.google.com/apikey |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | `gemini-2.5-flash` is being retired — do not use it. |
+
+> **Cost.** The two defaults are flagship-tier models. If this runs often,
+> switch `ANTHROPIC_MODEL` and `OPENAI_MODEL` to the cheaper tiers above —
+> a config change, no code change. Note that a cached run costs nothing at
+> all, and the chain only reaches the second provider when the first fails.
+
+**How the fallback behaves.** Each provider's SDK already retries connection
+errors, 429s and 5xx once; beyond that there is no extra retry loop, because
+with three providers the cascade *is* the retry. Failure reasons are curated
+in `app/analysis.py` — the caller gets a short cause per provider and never an
+upstream body, a traceback, or anything that could carry a credential.
 
 ### Collection
 
@@ -252,13 +272,19 @@ Request: `{"topic": "luxury villa rentals"}`
   "keywords": [
     {"keyword": "luxury villa rentals italy", "sources": ["luxury villa rentals"], "types": ["seed"]}
   ],
-  "analysis_markdown": "## 1. Search Intent Classification\n..."
+  "analysis_markdown": "## 1. Search Intent Classification\n...",
+  "analysis_provider": "anthropic",
+  "analysis_model": "claude-opus-5"
 }
 ```
 
 - `type` is one of `seed`, `alphabet`, `question`, `commercial`.
 - `sources` preserves the exact query that produced each suggestion. It is
   the client's verification data and is never flattened away.
+- `analysis_provider` is `anthropic`, `openai` or `gemini` — **which provider
+  actually produced the report**, not necessarily the first choice.
+  `analysis_model` is the exact model id it used. Both are stored with a
+  cached run, so a cached result reports the provider that originally ran it.
 - `keywords` is the deduplicated union, sorted alphabetically
   (case-insensitive), each entry carrying every source query and type that
   produced it. Dedupe is case-insensitive and keeps the first occurrence's
@@ -271,7 +297,8 @@ Errors:
 | 400 | `{"detail": "Topic must not be empty."}` / `{"detail": "Topic must be 100 characters or fewer."}` |
 | 401 | `{"detail": "Invalid or missing access key."}` / `{"detail": "Invalid or missing API key."}` |
 | 429 | `{"detail": "Search limit reached.", "retry_after_seconds": 1840}` plus a `Retry-After` header |
-| 502 | `{"detail": "Google returned no suggestions."}` / `{"detail": "AI analysis failed: <reason>"}` |
+| 502 | `{"detail": "Google returned no suggestions."}` |
+| 502 | `{"detail": "The AI analysis could not be completed.", "provider_failures": [{"provider","label","model","reason"}, ...]}` — every provider failed, one reason each |
 | 504 | `{"detail": "The run timed out."}` |
 
 No key, traceback, or upstream response body ever appears in `detail`.
@@ -310,11 +337,12 @@ a one-line swap in `build_state()` in `app/main.py`.
 
 ## Changing things without touching code
 
-**The AI model** — edit `GEMINI_MODEL` in `.env` (or in Render's environment)
-and restart. No model name appears anywhere in the code.
+**The AI model, or which provider leads** — edit `ANTHROPIC_MODEL`,
+`OPENAI_MODEL`, `GEMINI_MODEL` or `AI_PROVIDER_ORDER` and restart. No model
+name and no provider order appears anywhere in the code.
 
-> `gemini-2.5-flash` is being retired — do not use it. The default is
-> `gemini-3.5-flash`. Check Google's current model list before changing it.
+> `gemini-2.5-flash` is being retired — do not use it. Check each vendor's
+> current model list before changing a default.
 
 **The rate limit** — edit `RATE_LIMIT_MAX_SEARCHES` and
 `RATE_LIMIT_WINDOW_MINUTES` and restart.
@@ -338,8 +366,9 @@ Deployed by the root `render.yaml` as `keyword-analyzer-api`, or manually:
 | Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
 | Health check path | `/api/health` |
 
-Set `MODE=prod`, the three secrets (`ADMIN_PASSWORD`, `API_KEY`,
-`GEMINI_API_KEY`), and `ALLOWED_ORIGINS` to the frontend service's URL. The
+Set `MODE=prod`, the secrets (`ADMIN_PASSWORD`, `API_KEY`, and at least one
+of `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`), and
+`ALLOWED_ORIGINS` to the frontend service's URL. The
 blueprint fills `ALLOWED_ORIGINS` in automatically from the frontend
 service's host.
 

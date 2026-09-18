@@ -18,7 +18,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.analysis import AnalysisError, GeminiAnalyzer
+from app.analysis import AllProvidersFailed, AnalysisChain, AnalysisError
 from app.auth import (
     authenticate,
     get_session_store,
@@ -51,7 +51,7 @@ class AppState:
 
     http_client = None
     provider: SuggestProvider | None = None
-    analyzer: GeminiAnalyzer | None = None
+    analyzer: AnalysisChain | None = None
     limiter: RateLimiter | None = None
     cache: TTLCache | None = None
 
@@ -62,7 +62,7 @@ state = AppState()
 def build_state(settings: Settings) -> None:
     state.http_client = build_client(settings)
     state.provider = GoogleSuggestProvider(state.http_client, settings)
-    state.analyzer = GeminiAnalyzer(settings)
+    state.analyzer = AnalysisChain(settings)
     state.limiter = RateLimiter(
         settings.RATE_LIMIT_MAX_SEARCHES, settings.RATE_LIMIT_WINDOW_MINUTES
     )
@@ -84,9 +84,9 @@ async def lifespan(app: FastAPI):
     reset_session_store()
     build_state(settings)
     logger.info(
-        "started mode=%s model=%s limit=%s/%smin cache_ttl=%smin",
+        "started mode=%s ai_chain=%s limit=%s/%smin cache_ttl=%smin",
         settings.MODE,
-        settings.GEMINI_MODEL,
+        ",".join(settings.configured_providers) or "none",
         settings.RATE_LIMIT_MAX_SEARCHES,
         settings.RATE_LIMIT_WINDOW_MINUTES,
         settings.CACHE_TTL_MINUTES,
@@ -223,6 +223,14 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
         except asyncio.TimeoutError:
             logger.error("run timed out topic=%r", topic)
             raise HTTPException(status_code=504, detail="The run timed out.")
+        except AllProvidersFailed as exc:
+            return JSONResponse(
+                status_code=502,
+                content={
+                    "detail": "The AI analysis could not be completed.",
+                    "provider_failures": [f.as_dict() for f in exc.failures],
+                },
+            )
         except HTTPException:
             raise
 
@@ -252,7 +260,12 @@ async def run_analysis(
         raise HTTPException(status_code=502, detail="Google returned no suggestions.")
 
     try:
-        markdown = await state.analyzer.analyse(topic, [k.keyword for k in keywords])
+        analysis = await state.analyzer.analyse(topic, [k.keyword for k in keywords])
+    except AllProvidersFailed:
+        # Subclasses AnalysisError, so it must be re-raised ahead of the
+        # generic handler below; the route turns it into a body that carries
+        # one reason per provider.
+        raise
     except AnalysisError as exc:
         raise HTTPException(status_code=502, detail=f"AI analysis failed: {exc}")
 
@@ -269,19 +282,24 @@ async def run_analysis(
         searches_remaining=remaining_now,
         sources=sources,
         keywords=keywords,
-        analysis_markdown=markdown,
+        analysis_markdown=analysis.markdown,
+        analysis_provider=analysis.provider,
+        analysis_model=analysis.model,
     )
 
 
 def log_run(topic: str, payload: AnalyzeResponse, cache_hit: bool) -> None:
     """One structured line per run. Never logs credentials."""
     logger.info(
-        "run topic=%r duration=%.1fs queries=%d/%d keywords=%d cached=%s quota_remaining=%d",
+        "run topic=%r duration=%.1fs queries=%d/%d keywords=%d ai=%s/%s cached=%s "
+        "quota_remaining=%d",
         topic,
         payload.duration_seconds,
         payload.queries_succeeded,
         payload.queries_attempted,
         payload.total_keywords,
+        payload.analysis_provider,
+        payload.analysis_model,
         cache_hit,
         payload.searches_remaining,
     )

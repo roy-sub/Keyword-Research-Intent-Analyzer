@@ -934,11 +934,45 @@ a:hover { text-decoration: underline; }
 }
 .panel__toolbar--wrap { flex-wrap: wrap; }
 .panel__caption { font-size: var(--fs-xs); color: var(--c-ink-3); }
+@media (max-width: 30rem) { .attrib__label { display: none; } }
 .panel__summary {
   margin-bottom: var(--s-5);
   font-size: var(--fs-xs); color: var(--c-ink-3);
   font-variant-numeric: tabular-nums;
 }
+
+/* -- Attribution ----------------------------------------------------------
+      Which model wrote the report, stated next to the report itself. The dot
+      reuses an existing intent hue per provider so no new colour enters the
+      palette. --------------------------------------------------------------*/
+.attrib { display: flex; align-items: center; gap: var(--s-3); font-size: var(--fs-xs); min-width: 0; }
+.attrib__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-ink-4); flex: none; }
+.attrib__dot--anthropic { background: var(--c-commercial); }
+.attrib__dot--openai    { background: var(--c-question); }
+.attrib__dot--gemini    { background: var(--c-seed); }
+.attrib__label { color: var(--c-ink-3); }
+.attrib__provider { font-weight: 600; color: var(--c-ink-1); }
+.attrib__model {
+  padding: 1px var(--s-3);
+  background: var(--c-inset); border: 1px solid var(--c-line); border-radius: var(--r-xs);
+  font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--c-ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* -- Per-provider failure list -------------------------------------------*/
+.failures {
+  display: grid; gap: var(--s-4);
+  margin-top: var(--s-6); padding-top: var(--s-5);
+  border-top: 1px solid var(--c-danger-line);
+}
+.failure { display: flex; align-items: baseline; gap: var(--s-3); flex-wrap: wrap; font-size: var(--fs-sm); }
+.failure__dot { width: 6px; height: 6px; border-radius: 50%; flex: none; transform: translateY(-1px); }
+.failure__name { font-weight: 600; color: var(--c-ink-1); }
+.failure__model {
+  font-family: var(--font-mono); font-size: var(--fs-micro); color: var(--c-ink-3);
+}
+.failure__reason { color: var(--c-ink-2); }
+.failure__reason::before { content: "— "; color: var(--c-ink-4); }
 
 /* -- Grouped keywords -----------------------------------------------------*/
 .groups {

@@ -15,12 +15,14 @@ import pytest
 os.environ.setdefault("MODE", "dev")
 os.environ.setdefault("ADMIN_USERNAME", "admin")
 os.environ.setdefault("ADMIN_PASSWORD", "test-password")
+os.environ.setdefault("ANTHROPIC_API_KEY", "test-anthropic-key")
+os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
 os.environ.setdefault("SUGGEST_DELAY_SECONDS", "0.01")
 os.environ.setdefault("RATE_LIMIT_MAX_SEARCHES", "10")
 
 import app.main as main  # noqa: E402
-from app.analysis import GeminiAnalyzer  # noqa: E402
+from app.analysis import AnalysisResult  # noqa: E402
 from app.cache import TTLCache  # noqa: E402
 from app.config import get_settings, reset_settings_cache  # noqa: E402
 from app.rate_limit import RateLimiter  # noqa: E402
@@ -42,15 +44,18 @@ class FakeProvider:
 
 
 class FakeAnalyzer:
-    def __init__(self, markdown: str = TEST_MARKDOWN) -> None:
+    def __init__(self, markdown: str = TEST_MARKDOWN,
+                 provider: str = "anthropic", model: str = "claude-opus-5") -> None:
         self.markdown = markdown
+        self.provider = provider
+        self.model = model
         self.calls = 0
         self.last_keywords: list[str] = []
 
-    async def analyse(self, topic: str, keywords: list[str]) -> str:
+    async def analyse(self, topic: str, keywords: list[str]) -> AnalysisResult:
         self.calls += 1
         self.last_keywords = keywords
-        return self.markdown
+        return AnalysisResult(markdown=self.markdown, provider=self.provider, model=self.model)
 
 
 def suggest_body(suggestions: list[str], query: str = "q") -> bytes:

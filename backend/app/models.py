@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 SourceType = Literal["seed", "alphabet", "question", "commercial"]
+AnalysisProviderName = Literal["anthropic", "openai", "gemini"]
 
 
 class LoginRequest(BaseModel):
@@ -81,3 +82,7 @@ class AnalyzeResponse(BaseModel):
     sources: list[SourceGroup]
     keywords: list[KeywordEntry]
     analysis_markdown: str
+    # Which provider actually produced the report. The chain falls back, so
+    # this is not necessarily the first-choice provider.
+    analysis_provider: AnalysisProviderName
+    analysis_model: str

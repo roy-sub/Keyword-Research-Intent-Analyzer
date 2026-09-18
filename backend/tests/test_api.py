@@ -195,6 +195,60 @@ def test_all_queries_failing_returns_502_and_refunds_quota(client, auth):
     assert test_client.get("/api/status", headers=auth).json()["searches_remaining"] == 10
 
 
+def test_response_records_which_provider_produced_the_report(client, auth):
+    test_client, _p, analyzer = client
+    analyzer.provider = "openai"
+    analyzer.model = "gpt-6-astra"
+    body = test_client.post(
+        "/api/analyze", json={"topic": "villa rentals"}, headers=auth
+    ).json()
+    assert body["analysis_provider"] == "openai"
+    assert body["analysis_model"] == "gpt-6-astra"
+
+
+def test_all_providers_failing_returns_502_with_one_reason_each(client, auth):
+    test_client, _p, analyzer = client
+
+    from app.analysis import AllProvidersFailed, ProviderFailure
+
+    async def failing(topic, keywords):
+        raise AllProvidersFailed([
+            ProviderFailure("anthropic", "Claude", "claude-opus-5", "No API key configured."),
+            ProviderFailure("openai", "OpenAI", "gpt-6-astra", "Rate limit reached or quota exhausted."),
+            ProviderFailure("gemini", "Gemini", "gemini-3.5-flash", "The API key was rejected or lacks access."),
+        ])
+
+    analyzer.analyse = failing
+    response = test_client.post(
+        "/api/analyze", json={"topic": "villa rentals"}, headers=auth
+    )
+    assert response.status_code == 502
+    body = response.json()
+    assert body["detail"] == "The AI analysis could not be completed."
+    assert [f["label"] for f in body["provider_failures"]] == ["Claude", "OpenAI", "Gemini"]
+    assert body["provider_failures"][1]["reason"] == "Rate limit reached or quota exhausted."
+    assert all(set(f) == {"provider", "label", "model", "reason"}
+               for f in body["provider_failures"])
+
+
+def test_all_providers_failing_still_refunds_quota(client, auth):
+    test_client, _p, analyzer = client
+
+    from app.analysis import AllProvidersFailed, ProviderFailure
+
+    async def failing(topic, keywords):
+        raise AllProvidersFailed(
+            [ProviderFailure("anthropic", "Claude", "m", "No API key configured.")]
+        )
+
+    analyzer.analyse = failing
+    before = test_client.get("/api/status", headers=auth).json()["searches_remaining"]
+    test_client.post("/api/analyze", json={"topic": "villa rentals"}, headers=auth)
+    after = test_client.get("/api/status", headers=auth).json()["searches_remaining"]
+    # the AI failed after Google succeeded, so the run legitimately cost quota
+    assert after == before - 1
+
+
 def test_ai_failure_returns_502_with_a_clean_message(client, auth):
     test_client, _p, analyzer = client
 
@@ -349,7 +403,7 @@ async def test_password_with_special_characters_round_trips():
     from app.config import Settings
 
     tricky = "pW%25rd$with#odd!chars&more"
-    settings = Settings(ADMIN_USERNAME="admin", ADMIN_PASSWORD=tricky, GEMINI_API_KEY="k")
+    settings = Settings(ADMIN_USERNAME="admin", ADMIN_PASSWORD=tricky, ANTHROPIC_API_KEY="k")
     assert settings.ADMIN_PASSWORD == tricky
 
     token = await authenticate("admin", tricky, settings)

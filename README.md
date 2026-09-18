@@ -4,7 +4,7 @@
 
 Internal tool. Give **Refract** a seed topic; it collects Google autocomplete
 suggestions, merges them into a deduplicated keyword dataset, sends that
-dataset to Google's Gemini API for a search-intent analysis, and returns both
+dataset to an AI model for a search-intent analysis, and returns both
 the raw data and the AI report.
 
 This repository is a **monorepo containing two independently deployable
@@ -78,7 +78,7 @@ Two services, two origins, talking over CORS:
   └──────────────────────────┘
       │                    │
       ▼                    ▼
-  Google autocomplete   Gemini API
+  Google autocomplete   Claude → OpenAI → Gemini
 ```
 
 The browser is the only thing that talks to both. The backend never serves
@@ -105,7 +105,7 @@ services locally exactly as they are in production.
 
 ```bash
 cd backend
-cp .env.example .env     # then set ADMIN_PASSWORD and GEMINI_API_KEY
+cp .env.example .env     # then set ADMIN_PASSWORD + at least one AI key
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
@@ -149,8 +149,10 @@ Both services come from this one repo, each built from its own folder.
 1. Push this repo to GitHub.
 2. In Render: **New → Blueprint**, point it at this repo. It reads
    `render.yaml` and creates both services.
-3. Render prompts for the three secrets on the API service:
-   `ADMIN_PASSWORD`, `API_KEY`, `GEMINI_API_KEY`.
+3. Render prompts for the secrets on the API service: `ADMIN_PASSWORD`,
+   `API_KEY`, and the AI provider keys — `ANTHROPIC_API_KEY`,
+   `OPENAI_API_KEY`, `GEMINI_API_KEY`. **At least one AI key is required**;
+   unset providers are skipped.
 4. Deploy. `ALLOWED_ORIGINS` and `API_BASE_URL` are filled in automatically
    from each service's hostname, so there is no chicken-and-egg with URLs and
    nothing to paste by hand.

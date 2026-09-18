@@ -231,6 +231,7 @@
             <div class="progress progress--thin"><span id="countdown-fill" class="progress__fill"></span></div>
             <span id="countdown-value" class="countdown__value"></span>
           </div>
+          <ul id="error-providers" class="failures is-hidden"></ul>
         </div>
         <button id="error-action-btn" type="button" class="btn btn--secondary btn--sm is-hidden"></button>
       </div>
@@ -367,7 +368,12 @@
       <!-- Report -->
       <div id="panel-report" class="panel" role="tabpanel" aria-labelledby="tab-report" tabindex="0">
         <div class="panel__toolbar">
-          <p class="panel__caption" id="report-model">Intent analysis across the full keyword set</p>
+          <p class="attrib" id="report-attrib">
+            <span class="attrib__dot" id="attrib-dot" aria-hidden="true"></span>
+            <span class="attrib__label">Analysed by</span>
+            <span class="attrib__provider" id="attrib-provider"></span>
+            <span class="attrib__model" id="attrib-model"></span>
+          </p>
           <button id="copy-report-btn" type="button" class="btn btn--ghost btn--sm">
             <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
             <span class="btn__label">Copy report</span>

@@ -54,14 +54,26 @@ services:
           property: host
 
       # ---- AI ----
+      # Three providers, tried in order. At least one key must be set; an
+      # unset provider is skipped rather than failing the chain.
+      - key: AI_PROVIDER_ORDER
+        value: anthropic,openai,gemini
+      - key: AI_TIMEOUT_SECONDS
+        value: "120"
+      - key: MAX_KEYWORDS_IN_PROMPT
+        value: "600"
+      - key: ANTHROPIC_API_KEY
+        sync: false          # secret
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-5
+      - key: OPENAI_API_KEY
+        sync: false          # secret
+      - key: OPENAI_MODEL
+        value: gpt-6-astra
       - key: GEMINI_API_KEY
         sync: false          # secret
       - key: GEMINI_MODEL
         value: gemini-3.5-flash
-      - key: GEMINI_TIMEOUT_SECONDS
-        value: "120"
-      - key: MAX_KEYWORDS_IN_PROMPT
-        value: "600"
 
       # ---- Collection ----
       - key: SUGGEST_LANG
