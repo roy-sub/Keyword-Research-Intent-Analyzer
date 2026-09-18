@@ -493,12 +493,7 @@ a:hover { text-decoration: underline; }
   font-family: var(--font-display);
   font-size: 1.0625rem; font-weight: 600;
   letter-spacing: -0.025em; color: var(--c-ink-1);
-}
-.lockup__tag {
-  padding: 2px var(--s-3);
-  border: 1px solid var(--c-line-strong); border-radius: var(--r-xs);
-  font-size: var(--fs-micro); font-weight: 550;
-  letter-spacing: var(--tr-micro); text-transform: uppercase; color: var(--c-ink-3);
+  white-space: nowrap;
 }
 .lockup--sm .lockup__mark { width: 26px; height: 26px; }
 .lockup--sm .lockup__mark svg { width: 19px; height: 19px; }
@@ -1232,7 +1227,6 @@ a:hover { text-decoration: underline; }
   .topbar__inner { padding: 0 var(--s-6); }
   .footer { padding: var(--s-7) var(--s-6); }
   .quota__meter, .quota__text { display: none; }
-  .lockup__tag { display: none; }
   .results__head { align-items: flex-start; }
   .menu__panel--right { left: 0; right: auto; }
   .tabs { gap: var(--s-6); overflow-x: auto; scrollbar-width: none; }

@@ -1,4 +1,4 @@
-# Refract — frontend
+# Keyword Analyzer — frontend
 
 **Refract** turns one seed topic into the full spectrum of search intent. This
 is the client: plain HTML, CSS and JavaScript. **No build tooling, no npm, no

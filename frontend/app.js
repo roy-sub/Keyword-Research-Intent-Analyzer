@@ -97,7 +97,7 @@
   function logConnectionDiagnostics(err) {
     const target = API_BASE_URL || location.origin;
     console.error(
-      "[refract] Could not reach the API at " + target + ".\n" +
+      "[keyword-analyzer] Could not reach the API at " + target + ".\n" +
         "  1. Is the backend running and listening there?\n" +
         "  2. Does the backend allow this page's origin (" + location.origin +
         ")? In MODE=prod that means ALLOWED_ORIGINS must contain it exactly.\n" +

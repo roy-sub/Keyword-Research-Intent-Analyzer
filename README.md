@@ -1,8 +1,8 @@
-# Refract — Keyword Intent Intelligence
+# Keyword Analyzer
 
 *One topic in. The whole spectrum out.*
 
-Internal tool. Give **Refract** a seed topic; it collects Google autocomplete
+Internal tool. Give it a seed topic; it collects Google autocomplete
 suggestions, merges them into a deduplicated keyword dataset, sends that
 dataset to an AI model for a search-intent analysis, and returns both
 the raw data and the AI report.

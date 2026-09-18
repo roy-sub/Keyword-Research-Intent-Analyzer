@@ -1,4 +1,4 @@
-# Backend — Refract
+# Backend — Keyword Analyzer
 
 FastAPI service. Given a seed topic it collects Google autocomplete
 suggestions, merges them into a deduplicated keyword dataset, sends that
@@ -223,7 +223,7 @@ A small descriptor, so hitting the API host in a browser explains itself
 instead of returning a bare 404.
 
 ```json
-{"service": "refract-api", "status": "ok", "docs": "/docs"}
+{"service": "keyword-analyzer-api", "status": "ok", "docs": "/docs"}
 ```
 
 `docs` is `null` in prod.
