@@ -626,6 +626,29 @@ a:hover { text-decoration: underline; }
   .gate__panel { padding: var(--s-10); }
 }
 
+/* -- Demo-mode banner -----------------------------------------------------
+      Mock data must never be mistakable for a real run. The striped edge is
+      the one place a non-neutral treatment earns its keep: it has to be
+      impossible to overlook, including in a screenshot sent to someone who
+      was not there when it was taken. --------------------------------- */
+.demo-banner {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: var(--s-4);
+  padding: var(--s-4) var(--s-7);
+  background: var(--c-ink-1); color: var(--c-on-solid);
+  font-size: var(--fs-sm);
+  border-bottom: 3px solid var(--c-live);
+}
+.demo-banner .icon { width: 17px; height: 17px; flex: none; color: var(--c-live); }
+.demo-banner strong { font-weight: 600; }
+.demo-banner code {
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  padding: 1px var(--s-2); border-radius: var(--r-xs);
+  background: rgba(255, 255, 255, 0.14);
+}
+/* The topbar sits below the banner rather than under it. */
+body.is-mock .topbar { top: auto; }
+
 /* ==========================================================================
    5. APP SHELL
    ========================================================================== */
@@ -702,7 +725,7 @@ a:hover { text-decoration: underline; }
 
 .query {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
+  grid-template-columns: 1fr auto auto auto auto;
   background: var(--c-surface);
   border: 1px solid var(--c-line-strong);
   border-radius: var(--r-md);
@@ -725,6 +748,41 @@ a:hover { text-decoration: underline; }
   font-family: var(--font-mono); font-size: var(--fs-sm);
   color: var(--c-ink-2); font-variant-numeric: tabular-nums;
 }
+/* -- Market selector -----------------------------------------------------
+      A native <select>, restyled rather than rebuilt: it inherits keyboard
+      handling, screen-reader labelling and the platform's own wheel picker on
+      a phone, none of which a custom dropdown gets for free. The chevron is
+      ours because the native one cannot be recoloured. ------------------ */
+.query__seg--market { display: flex; flex-direction: column; justify-content: center; }
+.query__select-row { display: flex; align-items: center; gap: var(--s-3); }
+.query__select {
+  appearance: none; -webkit-appearance: none;
+  border: 0; background: none; padding: 0 var(--s-2) 0 0;
+  height: 26px; max-width: 13rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm); font-weight: 520;
+  color: var(--c-ink-1);
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+.query__select:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-xs); }
+.query__select:disabled { color: var(--c-ink-4); cursor: not-allowed; }
+.query__chev { width: 14px; height: 14px; color: var(--c-ink-4); flex: none; }
+.query__seg--market:hover .query__chev { color: var(--c-ink-2); }
+
+/* What the chosen market actually changes, stated rather than implied — the
+   difference between markets is invisible until a run comes back. */
+.query__hint {
+  margin-top: var(--s-4);
+  font-size: var(--fs-xs); color: var(--c-ink-3);
+}
+.query__hint code {
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  padding: 1px var(--s-2);
+  background: var(--c-inset); border-radius: var(--r-xs);
+  color: var(--c-ink-2);
+}
+
 .query__input-row { display: flex; align-items: center; gap: var(--s-4); }
 .query__icon { color: var(--c-ink-4); width: 17px; height: 17px; }
 .query__input {
@@ -741,12 +799,19 @@ a:hover { text-decoration: underline; }
 .query__action { padding: var(--s-5); display: flex; align-items: center; }
 .query__action .btn { min-width: 168px; }
 
-@media (max-width: 60rem) {
-  .query { grid-template-columns: 1fr 1fr; }
+@media (max-width: 72rem) {
+  /* Market gets the full width beside the topic before the metadata wraps:
+     it is an input, and the two metadata cells are not. */
+  .query { grid-template-columns: 1fr 1fr 1fr; }
   .query__seg--main { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--c-line); }
-  .query__seg--meta:nth-of-type(3) { border-right: 0; }
+  .query__seg--market { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--c-line); }
+  .query__select { max-width: none; }
   .query__action { grid-column: 1 / -1; border-top: 1px solid var(--c-line); }
   .query__action .btn { min-width: 0; }
+}
+@media (max-width: 40rem) {
+  .query { grid-template-columns: 1fr 1fr; }
+  .query__seg--meta:last-of-type { border-right: 0; }
 }
 
 /* ==========================================================================

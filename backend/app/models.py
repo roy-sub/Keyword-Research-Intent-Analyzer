@@ -47,10 +47,27 @@ class StatusResponse(BaseModel):
     retry_after_seconds: int
     request_delay_seconds: float
     expected_queries: int
+    markets: list[MarketInfo]
+    default_market: str
 
 
 class AnalyzeRequest(BaseModel):
     topic: str = ""
+    # Which locale to search. Omitted or unknown falls back to the configured
+    # default, so an old client or a stale bookmark still runs.
+    market: str = ""
+
+
+class MarketInfo(BaseModel):
+    """One locale the team can search in, as the picker renders it."""
+
+    code: str
+    label: str
+    lang: str
+    country: str
+    question_modifiers: list[str]
+    commercial_modifiers: list[str]
+    expected_queries: int
 
 
 class SourceGroup(BaseModel):
@@ -86,6 +103,10 @@ class AnalyzeResponse(BaseModel):
     # this is not necessarily the first-choice provider.
     analysis_provider: AnalysisProviderName
     analysis_model: str
+    # Which locale produced this set. Stored with the result so a cached run,
+    # a download and a PDF all report the market they actually came from.
+    market: str
+    market_label: str
 
 
 class ReportExportRequest(BaseModel):
@@ -102,6 +123,7 @@ class ReportExportRequest(BaseModel):
     generated_at: str = Field(default="", max_length=64)
     provider_label: str = Field(default="", max_length=64)
     model: str = Field(default="", max_length=120)
+    market_label: str = Field(default="", max_length=80)
     total_keywords: int | None = None
     queries_succeeded: int | None = None
     queries_attempted: int | None = None

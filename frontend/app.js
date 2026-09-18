@@ -20,6 +20,34 @@
   /* Holds the opaque session token returned by POST /api/login. The
      password itself is never stored. */
   const ACCESS_KEY_STORAGE = "keyword-analyzer.session";
+  /* The market is a per-person working preference, not shared state, so it
+     lives in the browser rather than on the server. */
+  const MARKET_STORAGE = "keyword-analyzer.market";
+
+  /* Mirrors the backend's default market registry. Only mock mode reads it;
+     a real session always renders from /api/status. */
+  const MOCK_STATUS = {
+    searches_remaining: 5,
+    window_minutes: 60,
+    retry_after_seconds: 0,
+    request_delay_seconds: 1.0,
+    expected_queries: 37,
+    default_market: "en-US",
+    markets: [
+      {
+        code: "en-US", label: "English \u00b7 United States", lang: "en", country: "us",
+        question_modifiers: ["who", "what", "when", "where", "why", "how"],
+        commercial_modifiers: ["best", "buy", "cheap", "near me"],
+        expected_queries: 37
+      },
+      {
+        code: "de-CH", label: "Deutsch \u00b7 Schweiz", lang: "de", country: "ch",
+        question_modifiers: ["wer", "wie", "was", "wo", "warum", "welche"],
+        commercial_modifiers: ["beste", "mieten", "buy", "best"],
+        expected_queries: 37
+      }
+    ]
+  };
   const CLIENT_TIMEOUT_MS = 180000;
   const MOCK_DELAY_MS = 6000;
 
@@ -42,6 +70,7 @@
   const state = {
     accessKey: null,
     mockMode: false,
+    market: null,
     mockSearchesRemaining: 6,
     status: null,
     quotaMax: 0,
@@ -138,6 +167,9 @@
     topicError: $("topic-error"),
     topicErrorText: $("topic-error-text"),
     runBtn: $("run-btn"),
+    mockBanner: $("mock-banner"),
+    marketSelect: $("market-select"),
+    marketHint: $("market-hint"),
     metaQueries: $("meta-queries"),
     metaPacing: $("meta-pacing"),
 
@@ -163,6 +195,7 @@
     cachedBadge: $("cached-badge"),
     resultsTopic: $("results-topic"),
     generatedAt: $("generated-at"),
+    resultsMarket: $("results-market"),
     newRunBtn: $("new-run-btn"),
     dlReportPdf: $("dl-report-pdf"),
     dlReportMd: $("dl-report-md"),
@@ -397,11 +430,11 @@
     return res.json();
   }
 
-  async function apiAnalyze(topic, signal) {
+  async function apiAnalyze(topic, market, signal) {
     const res = await fetch(apiUrl("/api/analyze"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Access-Key": state.accessKey },
-      body: JSON.stringify({ topic }),
+      body: JSON.stringify({ topic, market }),
       signal
     });
     if (!res.ok) throw new ApiError(res.status, await safeJson(res));
@@ -420,6 +453,7 @@
         analysis_markdown: data.analysis_markdown,
         generated_at: data.generated_at,
         provider_label: PROVIDER_NAMES[data.analysis_provider] || data.analysis_provider || "",
+        market_label: data.market_label || data.market || "",
         model: data.analysis_model,
         total_keywords: data.total_keywords,
         queries_succeeded: data.queries_succeeded,
@@ -437,12 +471,17 @@
     });
   }
 
-  async function mockAnalyze(topic, signal) {
+  async function mockAnalyze(topic, market, signal) {
     await mockDelay(MOCK_DELAY_MS, signal);
     const res = await fetch("mock-response.json", { signal });
     if (!res.ok) throw new Error("Could not load mock-response.json");
     const data = await res.json();
     data.topic = topic;
+    const chosen = currentMarket();
+    if (chosen) {
+      data.market = chosen.code;
+      data.market_label = chosen.label;
+    }
     data.searches_remaining = Math.max(0, state.mockSearchesRemaining - 1);
     state.mockSearchesRemaining = data.searches_remaining;
     return data;
@@ -577,11 +616,100 @@
     );
   }
 
+  function renderStatusDependentUi() {
+    renderRunParameters();
+    renderMarkets();
+  }
+
   function renderRunParameters() {
     const queries = expectedQueries();
     const delay = pacingDelay();
     el.metaQueries.textContent = String(queries);
     el.metaPacing.textContent = delay.toFixed(1) + "s";
+  }
+
+  /* ---- Market picker ----
+     Built from /api/status rather than hard-coded, so adding a market is a
+     backend change alone and an old cached page cannot offer one the server
+     has since disabled. */
+
+  function renderMarkets() {
+    const markets = availableMarkets();
+    if (!markets.length) {
+      el.marketSelect.disabled = true;
+      return;
+    }
+
+    const wanted = preferredMarket(markets);
+    el.marketSelect.innerHTML = "";
+    markets.forEach((m) => {
+      const option = document.createElement("option");
+      option.value = m.code;
+      option.textContent = m.label;
+      el.marketSelect.appendChild(option);
+    });
+    el.marketSelect.value = wanted;
+    el.marketSelect.disabled = markets.length < 2;
+    state.market = wanted;
+    renderMarketHint();
+  }
+
+  function availableMarkets() {
+    return (state.status && Array.isArray(state.status.markets))
+      ? state.status.markets
+      : [];
+  }
+
+  function currentMarket() {
+    return availableMarkets().find((m) => m.code === state.market) || null;
+  }
+
+  /* Last choice wins, then the server default, then whatever is first — so a
+     market the server has since disabled can never stay selected. */
+  function preferredMarket(markets) {
+    const codes = markets.map((m) => m.code);
+    let stored = null;
+    try { stored = sessionStorage.getItem(MARKET_STORAGE); } catch (e) { /* private mode */ }
+    if (stored && codes.indexOf(stored) !== -1) return stored;
+    const fallback = state.status && state.status.default_market;
+    if (fallback && codes.indexOf(fallback) !== -1) return fallback;
+    return codes[0];
+  }
+
+  /* The difference between markets is invisible until a run comes back, so
+     the words that actually change are shown up front. */
+  function renderMarketHint() {
+    const market = currentMarket();
+    el.marketHint.textContent = "";
+    if (!market) return;
+
+    /* Built as DOM nodes rather than an HTML string. The values come from our
+       own API and are constrained to a fixed registry, but a hint line is not
+       worth a place where markup could ever be injected. */
+    const frag = document.createDocumentFragment();
+    const code = (text) => {
+      const node = document.createElement("code");
+      node.textContent = text;
+      return node;
+    };
+    const text = (value) => document.createTextNode(value);
+
+    frag.appendChild(text("Searches Google as "));
+    frag.appendChild(code("hl=" + market.lang));
+    frag.appendChild(text(" "));
+    frag.appendChild(code("gl=" + market.country));
+    frag.appendChild(text(" with the words "));
+    market.question_modifiers.concat(market.commercial_modifiers).forEach((word, i) => {
+      if (i > 0) frag.appendChild(text(" "));
+      frag.appendChild(code(word));
+    });
+    el.marketHint.appendChild(frag);
+  }
+
+  function setMarket(code) {
+    state.market = code;
+    try { sessionStorage.setItem(MARKET_STORAGE, code); } catch (e) { /* private mode */ }
+    renderMarketHint();
   }
 
   function expectedQueries() {
@@ -771,6 +899,10 @@
 
     el.resultsTopic.textContent = data.topic;
     el.generatedAt.textContent = formatTimestamp(data.generated_at);
+    /* Which locale produced this set, taken from the response rather than
+       from the picker — a cached result reports the market it actually ran
+       in, even if the picker has since been changed. */
+    el.resultsMarket.textContent = data.market_label || data.market || "";
     el.cachedBadge.classList.toggle("is-hidden", !data.cached);
 
     renderMetrics(data);
@@ -1158,8 +1290,8 @@
 
     try {
       const data = state.mockMode
-        ? await mockAnalyze(topic, controller.signal)
-        : await apiAnalyze(topic, controller.signal);
+        ? await mockAnalyze(topic, state.market, controller.signal)
+        : await apiAnalyze(topic, state.market, controller.signal);
       renderResults(data);
       if (state.mockMode) renderQuotaLine(); else await refreshStatusQuietly();
     } catch (err) {
@@ -1178,7 +1310,7 @@
     try {
       state.status = await apiStatus();
       renderQuotaLine();
-      renderRunParameters();
+      renderStatusDependentUi();
     } catch (e) {
       /* quota display is best-effort; a failed refresh should not surface an error */
     }
@@ -1298,6 +1430,7 @@
       "# " + data.total_keywords + " keywords · " +
         data.queries_succeeded + " of " + data.queries_attempted + " queries · " +
         formatTimestamp(data.generated_at),
+      "# Market: " + (data.market_label || data.market || "unknown"),
       ""
     ];
     return header.concat(data.keywords.map((k) => k.keyword)).join("\n") + "\n";
@@ -1316,7 +1449,8 @@
       ">",
       "> - Generated: " + formatTimestamp(data.generated_at),
       "> - Unique keywords: " + data.total_keywords,
-      "> - Queries answered: " + data.queries_succeeded + " of " + data.queries_attempted
+      "> - Queries answered: " + data.queries_succeeded + " of " + data.queries_attempted,
+      "> - Market: " + (data.market_label || data.market || "unknown")
     ];
     if (by) lines.push("> - Analysed by: " + by);
     lines.push("", "---", "", data.analysis_markdown.trim(), "");
@@ -1328,6 +1462,8 @@
   function buildJson(data) {
     return JSON.stringify({
       topic: data.topic,
+      market: data.market,
+      market_label: data.market_label,
       generated_at: data.generated_at,
       total_keywords: data.total_keywords,
       queries_attempted: data.queries_attempted,
@@ -1379,7 +1515,7 @@
       setIdentity(username);
       showApp();
       renderQuotaLine();
-      renderRunParameters();
+      renderStatusDependentUi();
       setTimeout(() => el.topicInput.focus(), 0);
     } catch (err) {
       clearSession();
@@ -1491,6 +1627,10 @@
     flashButton(el.copyReportBtn, ok, "Copied", "Failed");
   });
 
+  el.marketSelect.addEventListener("change", () => {
+    setMarket(el.marketSelect.value);
+  });
+
   el.newRunBtn.addEventListener("click", () => {
     el.topicInput.focus();
     el.topicInput.select();
@@ -1564,9 +1704,15 @@
 
     if (state.mockMode) {
       setIdentity("mock");
+      el.mockBanner.classList.remove("is-hidden");
+      document.body.classList.add("is-mock");
+      /* Mock mode has no backend to ask, so it stands in a status payload
+         shaped exactly like the real one. That keeps every screen — the
+         market picker included — exercisable with no API key. */
+      state.status = MOCK_STATUS;
       showApp();
       renderQuotaLine();
-      renderRunParameters();
+      renderStatusDependentUi();
       return;
     }
 
@@ -1580,7 +1726,7 @@
       setIdentity("admin");
       showApp();
       renderQuotaLine();
-      renderRunParameters();
+      renderStatusDependentUi();
     } catch (e) {
       clearSession();
       showGate(e instanceof ApiError && e.status === 401

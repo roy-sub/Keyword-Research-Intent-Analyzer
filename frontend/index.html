@@ -39,11 +39,19 @@
     <g id="i-chevron-right"><path d="m8 5.6 4.4 4.4L8 14.4"/></g>
     <g id="i-hash"><path d="M7.6 3.6 6 16.4M14 3.6l-1.6 12.8M3.8 7.4h12.6M3.2 12.6h12.6"/></g>
     <g id="i-lock"><rect x="4" y="8.6" width="12" height="8.4" rx="1.8"/><path d="M6.8 8.6V6.4a3.2 3.2 0 0 1 6.4 0v2.2"/></g>
+    <g id="i-globe"><circle cx="10" cy="10" r="7.4"/><path d="M2.6 10h14.8M10 2.6c1.9 2 3 4.6 3 7.4s-1.1 5.4-3 7.4c-1.9-2-3-4.6-3-7.4s1.1-5.4 3-7.4z"/></g>
     <g id="i-target"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2.6"/></g>
   </defs>
 </svg>
 
 <a class="skip-link" href="#workspace">Skip to main content</a>
+
+<!-- Demo-mode banner. Mock data must never be mistakable for a real run:
+     the whole value of this tool is that the keywords are genuinely Google's. -->
+<div id="mock-banner" class="demo-banner is-hidden" role="status">
+  <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-info"/></svg>
+  <span><strong>Demo mode.</strong> These keywords are a saved sample, not a live Google result. Remove <code>?mock=1</code> from the address to run for real.</span>
+</div>
 
 <div id="lib-load-error" class="lib-banner is-hidden" role="alert">
   <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-alert"/></svg>
@@ -178,6 +186,16 @@
         </div>
       </div>
 
+      <div class="query__seg query__seg--market">
+        <label class="query__label" for="market-select">Market</label>
+        <div class="query__select-row">
+          <svg class="icon query__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-globe"/></svg>
+          <select id="market-select" class="query__select" name="market"
+                  aria-describedby="market-hint"></select>
+          <svg class="icon query__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+        </div>
+      </div>
+
       <div class="query__seg query__seg--meta">
         <span class="query__label">Queries</span>
         <span class="query__value" id="meta-queries">—</span>
@@ -195,6 +213,8 @@
         </button>
       </div>
     </form>
+
+    <p id="market-hint" class="query__hint"></p>
 
     <p id="topic-error" class="form-error form-error--loose is-hidden" role="alert">
       <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-alert"/></svg>
@@ -301,6 +321,9 @@
           <p class="results__meta">
             <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-clock"/></svg>
             <span id="generated-at"></span>
+            <span class="results__meta-sep" aria-hidden="true">&middot;</span>
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-globe"/></svg>
+            <span id="results-market"></span>
           </p>
         </div>
 

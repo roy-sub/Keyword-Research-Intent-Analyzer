@@ -211,7 +211,7 @@ def test_all_providers_failing_returns_502_with_one_reason_each(client, auth):
 
     from app.analysis import AllProvidersFailed, ProviderFailure
 
-    async def failing(topic, keywords):
+    async def failing(topic, keywords, market=None):
         raise AllProvidersFailed([
             ProviderFailure("anthropic", "Claude", "claude-sonnet-5", "No API key configured."),
             ProviderFailure("openai", "OpenAI", "gpt-5.4-mini", "Rate limit reached or quota exhausted."),
@@ -236,7 +236,7 @@ def test_all_providers_failing_still_refunds_quota(client, auth):
 
     from app.analysis import AllProvidersFailed, ProviderFailure
 
-    async def failing(topic, keywords):
+    async def failing(topic, keywords, market=None):
         raise AllProvidersFailed(
             [ProviderFailure("anthropic", "Claude", "m", "No API key configured.")]
         )
@@ -254,7 +254,7 @@ def test_ai_failure_returns_502_with_a_clean_message(client, auth):
 
     from app.analysis import AnalysisError
 
-    async def failing(topic, keywords):
+    async def failing(topic, keywords, market=None):
         raise AnalysisError("the model timed out")
 
     analyzer.analyse = failing

@@ -27,6 +27,7 @@ from app.auth import (
     reset_session_store,
 )
 from app.cache import TTLCache
+from app.markets import Market
 from app.config import ConfigError, Settings, configure_logging, get_settings
 from app.models import (
     AnalyzeRequest,
@@ -35,6 +36,7 @@ from app.models import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    MarketInfo,
     ReportExportRequest,
     ServiceInfo,
     StatusResponse,
@@ -173,6 +175,8 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
             retry_after_seconds=retry_after,
             request_delay_seconds=current.SUGGEST_DELAY_SECONDS,
             expected_queries=current.expected_queries,
+            markets=[MarketInfo(**m.as_dict()) for m in current.enabled_markets],
+            default_market=current.resolve_market(None).code,
         )
 
     @app.post("/api/analyze", response_model=AnalyzeResponse)
@@ -190,7 +194,8 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
                 status_code=400, detail="Topic must be 100 characters or fewer."
             )
 
-        cache_key = TTLCache.key(topic, current.SUGGEST_LANG, current.SUGGEST_COUNTRY)
+        market = current.resolve_market(body.market)
+        cache_key = TTLCache.key(topic, market.code)
 
         # A cache hit costs no quota and makes no upstream call.
         cached = state.cache.get(cache_key)
@@ -220,7 +225,7 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
         started = time.monotonic()
         try:
             payload = await asyncio.wait_for(
-                run_analysis(topic, current, remaining, started),
+                run_analysis(topic, market, current, remaining, started),
                 timeout=current.run_timeout_seconds,
             )
         except asyncio.TimeoutError:
@@ -262,6 +267,7 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
                 generated_at=body.generated_at,
                 provider_label=body.provider_label,
                 model=body.model,
+                market_label=body.market_label,
                 total_keywords=body.total_keywords,
                 queries_succeeded=body.queries_succeeded,
                 queries_attempted=body.queries_attempted,
@@ -279,10 +285,10 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
 
 
 async def run_analysis(
-    topic: str, settings: Settings, remaining: int, started: float
+    topic: str, market: Market, settings: Settings, remaining: int, started: float
 ) -> AnalyzeResponse:
     """Collect, merge, analyse. Quota is refunded if nothing was collected."""
-    results = await state.provider.fetch(topic, settings.SUGGEST_LANG, settings.SUGGEST_COUNTRY)
+    results = await state.provider.fetch(topic, market)
     sources, keywords, failed = merge_results(results)
 
     if not sources:
@@ -299,7 +305,9 @@ async def run_analysis(
         raise HTTPException(status_code=502, detail="Google returned no suggestions.")
 
     try:
-        analysis = await state.analyzer.analyse(topic, [k.keyword for k in keywords])
+        analysis = await state.analyzer.analyse(
+            topic, [k.keyword for k in keywords], market=market
+        )
     except AllProvidersFailed:
         # Subclasses AnalysisError, so it must be re-raised ahead of the
         # generic handler below; the route turns it into a body that carries
@@ -324,6 +332,8 @@ async def run_analysis(
         analysis_markdown=analysis.markdown,
         analysis_provider=analysis.provider,
         analysis_model=analysis.model,
+        market=market.code,
+        market_label=market.label,
     )
 
 

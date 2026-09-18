@@ -15,6 +15,7 @@ import random
 import httpx
 
 from app.config import ALPHABET, Settings
+from app.markets import Market
 from app.models import SourceType
 from app.suggest.base import SourceResult, build_query_set
 
@@ -86,20 +87,16 @@ class GoogleSuggestProvider:
         self._client = client
         self._settings = settings
 
-    async def fetch(self, topic: str, lang: str, country: str) -> list[SourceResult]:
-        settings = self._settings
-        queries = build_query_set(
-            topic,
-            ALPHABET,
-            settings.question_modifiers,
-            settings.commercial_modifiers,
-        )
+    async def fetch(self, topic: str, market: Market) -> list[SourceResult]:
+        queries = build_query_set(topic, ALPHABET, market)
 
         results: list[SourceResult] = []
         for index, (query, query_type) in enumerate(queries):
             if index > 0:
                 await self._pace()
-            results.append(await self._fetch_one(query, query_type, lang, country))
+            results.append(
+                await self._fetch_one(query, query_type, market.lang, market.country)
+            )
         return results
 
     async def _pace(self) -> None:
@@ -123,6 +120,7 @@ class GoogleSuggestProvider:
                 response = await self._client.get(
                     SUGGEST_URL,
                     params={"client": "firefox", "q": query, "hl": lang, "gl": country},
+                    headers={"Accept-Language": f"{lang},en;q=0.8"},
                     timeout=settings.SUGGEST_TIMEOUT_SECONDS,
                 )
             except httpx.TimeoutException:
@@ -178,13 +176,14 @@ class GoogleSuggestProvider:
 
 
 def build_client(settings: Settings) -> httpx.AsyncClient:
-    """One client per process, created and closed in the lifespan handler."""
+    """One client per process, created and closed in the lifespan handler.
+
+    Accept-Language is deliberately not set here: it varies per market, so it
+    is sent per request instead. A client-wide header would pin every run to
+    whichever market happened to be the default at startup.
+    """
     return httpx.AsyncClient(
-        headers={
-            "User-Agent": USER_AGENT,
-            "Accept": "*/*",
-            "Accept-Language": f"{settings.SUGGEST_LANG},en;q=0.8",
-        },
+        headers={"User-Agent": USER_AGENT, "Accept": "*/*"},
         timeout=settings.SUGGEST_TIMEOUT_SECONDS,
         follow_redirects=True,
     )

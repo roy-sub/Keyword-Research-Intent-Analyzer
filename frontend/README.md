@@ -151,6 +151,42 @@ Every state is designed, not defaulted:
 - **Keywords** — grouped by source query (accordions, type tag, count) or flat
   (keyword, its source queries, its type tags). Filter narrows both.
 
+### Market picker
+
+The query bar carries a **Market** selector: which Google to ask. It is a
+native `<select>`, restyled rather than rebuilt, so it inherits keyboard
+handling, screen-reader labelling and the platform's own wheel picker on a
+phone — none of which a custom dropdown gets for free.
+
+It is **populated from `/api/status`**, never hard-coded, so adding a market
+is a backend change alone and a stale cached page cannot offer one the server
+has since disabled.
+
+Three details that matter:
+
+- **The hint line states what actually changes** — `hl`, `gl` and the ten
+  modifier words, shown as chips. The difference between markets is otherwise
+  invisible until a run comes back, which is exactly when it is too late.
+- **The choice is remembered** in `sessionStorage`, because it is a personal
+  working preference rather than shared state. A market the server has since
+  disabled can never stay selected: the stored value is validated against the
+  live list on every load.
+- **Results report the market they ran in**, taken from the response rather
+  than from the picker — so a cached result names the market it actually used
+  even if the picker has since been changed. It travels into the TXT header,
+  the JSON body, the Markdown front-matter and the PDF facts strip.
+
+### Demo mode
+
+`?mock=1` runs the whole UI against `mock-response.json` with no backend and
+no API key. Because the value of this tool is that the keywords are genuinely
+Google's, **mock data must never be mistakable for a real run**: demo mode
+shows a black banner with an orange edge saying so, on every screen, and a
+real session never shows it.
+
+Mock mode also stands in a full `/api/status` payload, so every screen — the
+market picker included — stays exercisable offline.
+
 ### Downloads
 
 Downloads sit **in the tab that owns the data**, not behind one "Export"
@@ -319,7 +355,7 @@ All calls carry `X-Access-Key` except `/api/login`:
 | `POST /api/login` | `{username, password}` → `{ok, access_key}` |
 | `POST /api/logout` | invalidates the token |
 | `GET /api/status` | quota, window, pacing, expected query count |
-| `POST /api/analyze` | `{topic}` → the full result payload |
+| `POST /api/analyze` | `{topic, market}` → the full result payload |
 | `POST /api/export/report.pdf` | the report payload → `application/pdf` |
 
 `mock-response.json` is a valid `/api/analyze` response, and the backend test

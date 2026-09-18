@@ -279,6 +279,7 @@ def render_report_pdf(
     generated_at: str = "",
     provider_label: str = "",
     model: str = "",
+    market_label: str = "",
     total_keywords: int | None = None,
     queries_succeeded: int | None = None,
     queries_attempted: int | None = None,
@@ -316,6 +317,10 @@ def render_report_pdf(
         facts.append(("Unique keywords", f"{total_keywords:,}"))
     if queries_succeeded is not None and queries_attempted is not None:
         facts.append(("Queries answered", f"{queries_succeeded} of {queries_attempted}"))
+    if market_label:
+        # Which Google a set came from changes what it means, so the printed
+        # report has to say it — a PDF outlives the screen it was made on.
+        facts.append(("Market", market_label))
     if provider_label or model:
         facts.append(("Analysed by", " · ".join(p for p in (provider_label, model) if p)))
 

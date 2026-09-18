@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.config import Settings
+from app.markets import Market
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,8 @@ SYSTEM_INSTRUCTION = (
 
 PROMPT_TEMPLATE = """Analyse the keyword set below for the seed topic "{topic}".
 
+{market_line}
+
 {count_line}
 
 Produce a Markdown report with exactly these four sections, using these
@@ -98,12 +101,26 @@ about the audience.
 The questions being asked, the gaps they reveal, and the specific pages or
 articles worth building — ordered by likely value.
 
+Write the report itself in English whatever language the keywords are in, and
+keep the four headings exactly as given above. Quote each keyword in its
+original language and spelling — never translate a keyword, because a
+translated keyword is not a search anyone performed.
+
 Keywords:
 {keywords}
 """
 
 
-def build_prompt(topic: str, keywords: list[str], max_keywords: int) -> str:
+def build_prompt(
+    topic: str, keywords: list[str], max_keywords: int, market: Market | None = None
+) -> str:
+    """Build the analysis prompt.
+
+    The market is named explicitly because a model shown a list of German
+    compounds with no context tends to read them as noise, or worse, to
+    translate them. Saying which country and language the searches came from
+    is what keeps the intent classification grounded in the right market.
+    """
     total = len(keywords)
     included = keywords[:max_keywords]
     if total > max_keywords:
@@ -114,8 +131,21 @@ def build_prompt(topic: str, keywords: list[str], max_keywords: int) -> str:
         )
     else:
         count_line = f"The set contains {total} unique keywords, listed in full below."
+    if market is None:
+        market_line = (
+            "These are real Google autocomplete suggestions collected for this topic."
+        )
+    else:
+        market_line = (
+            f"These are real Google autocomplete suggestions collected in "
+            f"{market.language_name} for {market.country.upper()} "
+            f"(Google parameters hl={market.lang}, gl={market.country}). "
+            f"Read them as {market.language_name} searches made by people in "
+            f"that market."
+        )
     return PROMPT_TEMPLATE.format(
         topic=topic,
+        market_line=market_line,
         count_line=count_line,
         keywords="\n".join(f"- {k}" for k in included),
     )
@@ -410,9 +440,11 @@ class AnalysisChain:
         self._settings = settings
         self.providers = providers if providers is not None else build_providers(settings)
 
-    async def analyse(self, topic: str, keywords: list[str]) -> AnalysisResult:
+    async def analyse(
+        self, topic: str, keywords: list[str], market: Market | None = None
+    ) -> AnalysisResult:
         settings = self._settings
-        prompt = build_prompt(topic, keywords, settings.MAX_KEYWORDS_IN_PROMPT)
+        prompt = build_prompt(topic, keywords, settings.MAX_KEYWORDS_IN_PROMPT, market)
         failures: list[ProviderFailure] = []
 
         for provider in self.providers:

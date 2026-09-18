@@ -16,15 +16,13 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app import markets
+from app.markets import Market
+
 
 class ConfigError(RuntimeError):
     """Raised at startup when required configuration is missing."""
 
-
-# Default modifier lists. They live here rather than inline in the collection
-# logic so a different market/language can be supported by config alone.
-DEFAULT_QUESTION_MODIFIERS = ["who", "what", "when", "where", "why", "how"]
-DEFAULT_COMMERCIAL_MODIFIERS = ["best", "buy", "cheap", "near me"]
 
 ALPHABET = [chr(c) for c in range(ord("a"), ord("z") + 1)]
 
@@ -62,14 +60,18 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-3.8-flash"
 
+    # ---- Markets ----------------------------------------------------------
+    # Which locales the team can pick between, and which one is preselected.
+    # A market carries its own question and buying words, because changing the
+    # language without changing those words silently wastes ten of the 37
+    # queries. See app/markets.py.
+    ENABLED_MARKETS: str = "en-US,de-CH"
+    DEFAULT_MARKET: str = "en-US"
+
     # ---- Collection -------------------------------------------------------
-    SUGGEST_LANG: str = "en"
-    SUGGEST_COUNTRY: str = "us"
     SUGGEST_DELAY_SECONDS: float = 1.0
     SUGGEST_TIMEOUT_SECONDS: float = 5.0
     SUGGEST_MAX_RETRIES: int = 2
-    SUGGEST_QUESTION_MODIFIERS: str = ",".join(DEFAULT_QUESTION_MODIFIERS)
-    SUGGEST_COMMERCIAL_MODIFIERS: str = ",".join(DEFAULT_COMMERCIAL_MODIFIERS)
 
     # ---- Limits and logging ----------------------------------------------
     RATE_LIMIT_MAX_SEARCHES: int = 10
@@ -108,12 +110,39 @@ class Settings(BaseSettings):
         return origins
 
     @property
-    def question_modifiers(self) -> list[str]:
-        return [m.strip() for m in self.SUGGEST_QUESTION_MODIFIERS.split(",") if m.strip()]
+    def enabled_markets(self) -> list[Market]:
+        """The markets offered in the picker, in the order configured.
+
+        Unknown codes are dropped rather than raising: a typo in one entry
+        should not take the service down. An empty result falls back to the
+        default market, so the picker is never empty.
+        """
+        found: list[Market] = []
+        for raw in self.ENABLED_MARKETS.split(","):
+            market = markets.get(raw)
+            if market is not None and market not in found:
+                found.append(market)
+        if not found:
+            found = [self.default_market]
+        return found
 
     @property
-    def commercial_modifiers(self) -> list[str]:
-        return [m.strip() for m in self.SUGGEST_COMMERCIAL_MODIFIERS.split(",") if m.strip()]
+    def default_market(self) -> Market:
+        """Preselected market. Falls back to en-US so this cannot be unset."""
+        return markets.get(self.DEFAULT_MARKET) or markets.MARKETS["en-US"]
+
+    def resolve_market(self, code: str | None) -> Market:
+        """Map a requested market code to an enabled market.
+
+        An unknown or absent code resolves to the default rather than
+        erroring, so an old bookmark or a stale client cannot fail a run.
+        """
+        if code:
+            requested = markets.get(code)
+            if requested is not None and requested in self.enabled_markets:
+                return requested
+        default = self.default_market
+        return default if default in self.enabled_markets else self.enabled_markets[0]
 
     @property
     def provider_order(self) -> list[str]:
@@ -138,8 +167,13 @@ class Settings(BaseSettings):
 
     @property
     def expected_queries(self) -> int:
-        """Seed + a-z + question modifiers + commercial modifiers."""
-        return 1 + len(ALPHABET) + len(self.question_modifiers) + len(self.commercial_modifiers)
+        """Seed + a-z + question modifiers + commercial modifiers.
+
+        Every market is built to the same 37-query shape, so this is a single
+        number rather than something the UI has to recompute per market. The
+        max keeps the run timeout safe if a future market is ever larger.
+        """
+        return max(m.expected_queries for m in self.enabled_markets)
 
     @property
     def run_timeout_seconds(self) -> float:

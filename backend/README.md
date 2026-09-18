@@ -78,6 +78,7 @@ backend/
     cache.py          TTL + LRU cache
     models.py         request/response models (the API contract)
     analysis.py       prompt, the three providers, and the fallback chain
+    markets.py        locale registry: language, country and modifier words
     pdf.py            Markdown → typeset PDF (ReportLab Platypus)
     suggest/
       base.py         SuggestProvider protocol, query set, dedupe, merge
@@ -163,13 +164,14 @@ upstream body, a traceback, or anything that could carry a credential.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `SUGGEST_LANG` | `en` | Autocomplete `hl`. |
-| `SUGGEST_COUNTRY` | `us` | Autocomplete `gl`. |
+| `ENABLED_MARKETS` | `en-US,de-CH` | Which locales the picker offers. Unknown codes are dropped rather than raising. |
+| `DEFAULT_MARKET` | `en-US` | Which one is preselected; switchable per run in the UI. |
 | `SUGGEST_DELAY_SECONDS` | `1.0` | Delay between consecutive requests, plus random jitter. |
 | `SUGGEST_TIMEOUT_SECONDS` | `5.0` | Per-request timeout. |
 | `SUGGEST_MAX_RETRIES` | `2` | Retries per query on timeout / 429 / 5xx. |
-| `SUGGEST_QUESTION_MODIFIERS` | `who,what,when,where,why,how` | Prefixed to the seed. |
-| `SUGGEST_COMMERCIAL_MODIFIERS` | `best,buy,cheap,near me` | `near me` is appended; the rest prefixed. |
+
+Modifier words are **not** environment variables: they belong to a market, not
+to a deployment. See **Markets** below.
 
 ### Limits and logging
 
@@ -356,6 +358,82 @@ Errors:
 ### `POST /api/login`, `POST /api/logout`
 
 See **Authentication** above.
+
+---
+
+## Markets
+
+A market is a **language, a country, and the modifier words that suit them**,
+bundled together and chosen per run.
+
+They are bundled because separating them is the trap. Setting `hl=de` while
+still firing `how`, `what` and `near me` at a German topic returns almost
+nothing for ten of the 37 queries — the run looks like it worked, and quietly
+came back a third thinner. The words have to move with the language, so they
+live in the same object.
+
+| Code | Label | `hl` / `gl` | Question words | Buying words |
+|---|---|---|---|---|
+| `en-US` | English · United States | `en` / `us` | who, what, when, where, why, how | best, buy, cheap, near me |
+| `de-CH` | Deutsch · Schweiz | `de` / `ch` | wer, wie, was, wo, warum, welche | beste, mieten, buy, best |
+| `de-DE` | Deutsch · Deutschland | `de` / `de` | wer, wie, was, wo, warum, welche | beste, kaufen, günstig, mieten |
+| `en-GB` | English · United Kingdom | `en` / `gb` | who, what, when, where, why, how | best, buy, cheap, near me |
+
+`de-CH`'s word lists are taken verbatim from the client briefing.
+
+**Rules the registry holds to**, each covered by a test:
+
+- **Every market is 37 queries** — seed, 26 letters, 6 question words, 4
+  buying words. That keeps two markets directly comparable, and means the
+  progress estimate, the run timeout and the expected counts need no
+  per-market special case.
+- **No market mixes languages** in its question words.
+- **Position is declared, not guessed.** Modifiers are prefixes, as in the
+  client's reference code. The handful that read as suffixes (`near me`) are
+  listed explicitly, so a German modifier is never mis-positioned by an
+  English heuristic like `startswith("near")`.
+- **`Accept-Language` is sent per request**, not set on the shared client — a
+  client-wide header would pin every run to whichever market happened to be
+  the default at startup.
+- **The cache is keyed on the market**, not on `hl`/`gl`. Two markets can
+  share a language and still produce different keywords, so `de-CH` must
+  never be served a `de-DE` cache entry.
+- **Unknown codes fall back, they do not fail.** A stale client or an old
+  bookmark resolves to the default rather than 400-ing. A market that is not
+  in `ENABLED_MARKETS` is refused even if the code is valid.
+- **The prompt names the market**, so the model is told it is reading German
+  and does not mistake compounds for noise or try to translate them. Keywords
+  are quoted in their original language; the report itself stays in English
+  so the four headings remain exactly as the briefing specifies.
+
+Adding a market is one entry in `app/markets.py` and one code in
+`ENABLED_MARKETS`. Nothing else changes.
+
+---
+
+## Proving the data is really Google's
+
+`scripts/verify_live.py` exists so the keyword list never has to be taken on
+trust. It asks Google directly using **only the standard library — no code
+from this project** — then asks the same question through the app's own
+collection path, and compares.
+
+```bash
+python scripts/verify_live.py "ski chalet zermatt"
+python scripts/verify_live.py "chalet zermatt mieten" --market de-CH
+python scripts/verify_live.py "bundesliga top scorers" --full   # all 37, ~40s
+```
+
+It prints the raw bytes Google returned, so the comparison is auditable rather
+than asserted. If the app ever reported a keyword Google did not return, the
+script names it and exits non-zero. It calls no AI provider, writes nothing,
+and costs no quota — it does not go through the API, so the rate limiter is
+not involved.
+
+The comparison is asymmetric on purpose: **extra** keywords would prove
+fabrication, but **missing** ones prove nothing, because autocomplete is
+genuinely not deterministic and two calls a second apart can differ. Only the
+extras fail the check.
 
 ---
 

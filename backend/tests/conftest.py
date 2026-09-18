@@ -25,6 +25,7 @@ import app.main as main  # noqa: E402
 from app.analysis import AnalysisResult  # noqa: E402
 from app.cache import TTLCache  # noqa: E402
 from app.config import get_settings, reset_settings_cache  # noqa: E402
+from app.markets import Market  # noqa: E402
 from app.rate_limit import RateLimiter  # noqa: E402
 from app.suggest.base import SourceResult  # noqa: E402
 
@@ -37,9 +38,11 @@ class FakeProvider:
     def __init__(self, results: list[SourceResult]) -> None:
         self.results = results
         self.calls = 0
+        self.last_market: Market | None = None
 
-    async def fetch(self, topic: str, lang: str, country: str) -> list[SourceResult]:
+    async def fetch(self, topic: str, market: Market) -> list[SourceResult]:
         self.calls += 1
+        self.last_market = market
         return list(self.results)
 
 
@@ -52,9 +55,12 @@ class FakeAnalyzer:
         self.calls = 0
         self.last_keywords: list[str] = []
 
-    async def analyse(self, topic: str, keywords: list[str]) -> AnalysisResult:
+    async def analyse(
+        self, topic: str, keywords: list[str], market: Market | None = None
+    ) -> AnalysisResult:
         self.calls += 1
         self.last_keywords = keywords
+        self.last_market = market
         return AnalysisResult(markdown=self.markdown, provider=self.provider, model=self.model)
 
 

@@ -10,6 +10,7 @@ import json
 import httpx
 import pytest
 
+from app import markets
 from app.config import Settings
 from app.suggest.base import SourceResult, build_query_set, dedupe_keywords, merge_results
 from app.suggest.google import GoogleSuggestProvider
@@ -28,14 +29,13 @@ def make_settings(**overrides) -> Settings:
     return Settings(**base)
 
 
+ALPHA = [chr(c) for c in range(ord("a"), ord("z") + 1)]
+
+
 def test_query_set_covers_seed_alphabet_and_modifiers():
     settings = make_settings()
-    queries = build_query_set(
-        "villa rentals",
-        [chr(c) for c in range(ord("a"), ord("z") + 1)],
-        settings.question_modifiers,
-        settings.commercial_modifiers,
-    )
+    queries = build_query_set("villa rentals", ALPHA, markets.MARKETS["en-US"])
+
     assert len(queries) == settings.expected_queries == 37
     types = [t for _q, t in queries]
     assert types.count("seed") == 1
@@ -46,6 +46,44 @@ def test_query_set_covers_seed_alphabet_and_modifiers():
     assert ("villa rentals a", "alphabet") in queries
     assert ("how villa rentals", "question") in queries
     assert ("villa rentals near me", "commercial") in queries
+
+
+def test_german_market_uses_german_modifiers_as_prefixes():
+    """The point of markets: the question words move with the language.
+
+    Asking Google for `how ferienwohnung zermatt` with hl=de returns almost
+    nothing, so a market that changed hl without changing these words would
+    quietly waste ten of the 37 queries.
+    """
+    queries = build_query_set("ferienwohnung zermatt", ALPHA, markets.MARKETS["de-CH"])
+
+    assert len(queries) == 37
+    assert ("wie ferienwohnung zermatt", "question") in queries
+    assert ("warum ferienwohnung zermatt", "question") in queries
+    assert ("beste ferienwohnung zermatt", "commercial") in queries
+    assert ("mieten ferienwohnung zermatt", "commercial") in queries
+    # No English question word leaks into a German run.
+    assert not any(q.startswith("how ") for q, _t in queries)
+    assert not any(q.endswith(" near me") for q, _t in queries)
+
+
+@pytest.mark.parametrize("code", markets.codes())
+def test_every_market_is_the_same_37_query_shape(code):
+    """Markets must stay comparable, and the run timeout assumes one shape."""
+    queries = build_query_set("topic", ALPHA, markets.MARKETS[code])
+    types = [t for _q, t in queries]
+    assert len(queries) == 37
+    assert types.count("seed") == 1
+    assert types.count("alphabet") == 26
+    assert types.count("question") == 6
+    assert types.count("commercial") == 4
+
+
+def test_suffix_modifiers_are_positioned_by_the_registry_not_guessed():
+    """`near me` follows the noun; every other modifier leads it."""
+    en = build_query_set("gym", ALPHA, markets.MARKETS["en-US"])
+    assert ("gym near me", "commercial") in en
+    assert ("best gym", "commercial") in en
 
 
 def test_dedupe_is_case_insensitive_and_keeps_first_casing():
@@ -96,7 +134,7 @@ async def test_provider_records_failures_without_failing_the_run():
 
     settings = make_settings(SUGGEST_MAX_RETRIES=0)
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
-        results = await GoogleSuggestProvider(http, settings).fetch("villa", "en", "us")
+        results = await GoogleSuggestProvider(http, settings).fetch("villa", markets.MARKETS["en-US"])
 
     failures = [r for r in results if not r.ok]
     assert len(failures) == 1
@@ -160,7 +198,7 @@ async def test_requests_are_paced_and_sequential(monkeypatch):
     settings = make_settings(SUGGEST_DELAY_SECONDS=1.5)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http:
-        results = await GoogleSuggestProvider(http, settings).fetch("villa", "en", "us")
+        results = await GoogleSuggestProvider(http, settings).fetch("villa", markets.MARKETS["en-US"])
 
     assert len(results) == settings.expected_queries
 

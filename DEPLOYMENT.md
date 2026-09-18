@@ -60,10 +60,13 @@ so **neither URL has to be known in advance**:
 │   │   ├── models.py            request/response models (the API contract)
 │   │   ├── analysis.py          prompt, three providers, fallback chain
 │   │   ├── pdf.py               Markdown → typeset PDF (ReportLab Platypus)
+│   │   ├── markets.py           locale registry: language, country, modifier words
 │   │   └── suggest/
 │   │       ├── base.py          SuggestProvider protocol, query set, merge
 │   │       └── google.py        GoogleSuggestProvider
-│   ├── tests/                   109 tests
+│   ├── scripts/
+│   │   └── verify_live.py       proves the keywords are Google's, not ours
+│   ├── tests/                   153 tests
 │   ├── .env.example
 │   ├── requirements.txt
 │   └── pytest.ini
@@ -130,13 +133,33 @@ never a key.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `SUGGEST_LANG` | `en` | Autocomplete `hl`. |
-| `SUGGEST_COUNTRY` | `us` | Autocomplete `gl`. |
 | `SUGGEST_DELAY_SECONDS` | `1.0` | Pause between requests, plus up to 30% jitter. |
 | `SUGGEST_TIMEOUT_SECONDS` | `5.0` | Per-request timeout. |
 | `SUGGEST_MAX_RETRIES` | `2` | Backoff on timeouts, 429s and 5xx. |
-| `SUGGEST_QUESTION_MODIFIERS` | `who,what,when,where,why,how` | |
-| `SUGGEST_COMMERCIAL_MODIFIERS` | `best,buy,cheap,near me` | |
+
+### Markets
+
+| Variable | Default | Notes |
+|---|---|---|
+| `ENABLED_MARKETS` | `en-US,de-CH` | Which locales the picker offers. Unknown codes are dropped, not fatal. |
+| `DEFAULT_MARKET` | `en-US` | Preselected; anyone can switch per run in the UI. |
+
+A market is a language, a country **and** the question and buying words that
+suit them — all three move together. Setting `hl=de` while still firing
+`how`, `what` and `near me` at a German topic returns almost nothing for ten
+of the 37 queries: the run looks fine and comes back a third thinner.
+
+| Code | `hl`/`gl` | Question words | Buying words |
+|---|---|---|---|
+| `en-US` | `en`/`us` | who, what, when, where, why, how | best, buy, cheap, near me |
+| `de-CH` | `de`/`ch` | wer, wie, was, wo, warum, welche | beste, mieten, buy, best |
+| `de-DE` | `de`/`de` | wer, wie, was, wo, warum, welche | beste, kaufen, günstig, mieten |
+| `en-GB` | `en`/`gb` | who, what, when, where, why, how | best, buy, cheap, near me |
+
+Every market is the same 37-query shape, so switching costs nothing in speed,
+quota or comparability. Modifier words are **not** environment variables —
+they belong to a market, not a deployment. Adding one is a single entry in
+`backend/app/markets.py`.
 
 > Requests run **strictly sequentially, never concurrently.** This is a
 > deliberate requirement, not an implementation accident. Raising
@@ -221,7 +244,7 @@ All bodies are JSON. Auth is `X-Access-Key: <token>` unless noted.
 | `POST /api/login` | none | `{username, password}` → `{ok, access_key}` |
 | `POST /api/logout` | yes | Invalidates the token |
 | `GET /api/status` | yes | Quota, window, pacing, expected query count |
-| `POST /api/analyze` | yes | `{topic}` → the full result payload |
+| `POST /api/analyze` | yes | `{topic, market}` → the full result payload |
 | `POST /api/export/report.pdf` | yes | The report payload → `application/pdf` |
 
 `/api/export/report.pdf` takes the report the client already holds rather
@@ -236,7 +259,37 @@ traceback or upstream response body ever appears in `detail`.**
 
 ---
 
-## 7. Operational notes
+## 7. Proving the data is real
+
+The keyword list should never have to be taken on trust.
+
+```bash
+cd backend && source .venv/bin/activate
+python scripts/verify_live.py "ski chalet zermatt"
+python scripts/verify_live.py "chalet zermatt mieten" --market de-CH
+python scripts/verify_live.py "bundesliga top scorers" --full   # all 37, ~40s
+```
+
+The script asks Google directly using **only the standard library — no code
+from this project** — then asks the same question through the app's own
+collection path and compares the two. It prints the raw bytes Google returned,
+so the check is auditable rather than asserted. If the app ever reported a
+keyword Google did not return, it names it and exits non-zero.
+
+It calls no AI provider, writes nothing, and costs no quota.
+
+Two supporting guarantees:
+
+- **There is no code path that invents a keyword.** Keywords only ever come
+  from a Google response body. The AI is handed the collected list and writes
+  prose about it; it never adds to the list.
+- **Demo mode is unmistakable.** `?mock=1` serves a saved sample and shows a
+  black banner with an orange edge saying so, on every screen. A real run
+  never shows it.
+
+---
+
+## 8. Operational notes
 
 - **Health stays responsive during a run.** The collection pipeline never
   blocks the event loop; `/api/health` answers in ~1 ms throughout a full
@@ -254,7 +307,7 @@ traceback or upstream response body ever appears in `detail`.**
 
 ---
 
-## 8. Downloads
+## 9. Downloads
 
 Downloads live in the tab that owns the data, not in a header menu.
 
@@ -275,7 +328,7 @@ Downloads live in the tab that owns the data, not in a header menu.
 
 ---
 
-## 9. Verifying a deploy
+## 10. Verifying a deploy
 
 ```bash
 # 1. Health (no auth)
@@ -306,7 +359,7 @@ Then open the web service, sign in, and run one topic end to end.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
@@ -315,13 +368,15 @@ Then open the web service, sign in, and run one topic end to end.
 | Startup crash on boot | A required variable is missing | The log names it. Usually `ADMIN_PASSWORD`, or `API_KEY`/`ALLOWED_ORIGINS` under `MODE=prod`. |
 | All three providers fail | No key set, or all keys invalid/over quota | The 502 body names one reason per provider. |
 | Many throttled queries | Google is rate-limiting | Raise `SUGGEST_DELAY_SECONDS`. Partial results are still real data. |
+| German topic returns little | Market is set to English | Switch the **Market** picker to *Deutsch · Schweiz*. It changes `hl`/`gl` **and** the question words. |
+| "Is this real data?" | — | Run `scripts/verify_live.py` (§7). |
 | PDF download shows a note | The export call failed | Markdown still works. Check the API log for `pdf render failed`. |
 | Report renders as plain text | `marked`/`DOMPurify` did not load from the CDN | A banner says so. Keyword data is unaffected. |
 | Fonts look like the system stack | Google Fonts unreachable | Layout holds — sizes and spacing are tokens, not font-dependent. |
 
 ---
 
-## 11. Design system (for future changes)
+## 12. Design system (for future changes)
 
 Documented in full in `frontend/README.md`. The short version:
 
@@ -343,11 +398,11 @@ All text pairs meet WCAG AA, verified by computing ratios from the tokens.
 
 ---
 
-## 12. Tests
+## 13. Tests
 
 ```bash
 cd backend && source .venv/bin/activate && pytest -q
-# → 109 passed
+# → 153 passed
 ```
 
 The suite mocks all HTTP; it never calls Google or any AI provider. Two

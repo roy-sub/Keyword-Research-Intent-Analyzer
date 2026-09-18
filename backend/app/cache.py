@@ -26,10 +26,17 @@ class TTLCache:
         self._lock = threading.Lock()
 
     @staticmethod
-    def key(topic: str, lang: str, country: str) -> tuple[str, str, str]:
-        return (normalise_topic(topic), lang.lower(), country.lower())
+    def key(topic: str, market_code: str) -> tuple[str, str]:
+        """Keyed on the market, not on lang/country.
 
-    def get(self, key: tuple[str, str, str]) -> Any | None:
+        Two markets can share a language and still produce different
+        keywords, because they carry different modifier words. Keying on the
+        market code is what stops a German-Swiss run being served from a
+        German-German cache entry.
+        """
+        return (normalise_topic(topic), market_code.lower())
+
+    def get(self, key: tuple[str, str]) -> Any | None:
         now = time.monotonic()
         with self._lock:
             entry = self._data.get(key)
@@ -42,7 +49,7 @@ class TTLCache:
             self._data.move_to_end(key)
             return value
 
-    def set(self, key: tuple[str, str, str], value: Any) -> None:
+    def set(self, key: tuple[str, str], value: Any) -> None:
         with self._lock:
             self._data[key] = (time.monotonic(), value)
             self._data.move_to_end(key)

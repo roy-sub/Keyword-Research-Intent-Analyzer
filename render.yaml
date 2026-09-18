@@ -75,21 +75,22 @@ services:
       - key: GEMINI_MODEL
         value: gemini-3.8-flash
 
+      # ---- Markets ----
+      # Which locales the team can pick between in the UI, and which one is
+      # preselected. A market carries its own question and buying words, so
+      # switching language also switches those — see backend/app/markets.py.
+      - key: ENABLED_MARKETS
+        value: en-US,de-CH
+      - key: DEFAULT_MARKET
+        value: en-US
+
       # ---- Collection ----
-      - key: SUGGEST_LANG
-        value: en
-      - key: SUGGEST_COUNTRY
-        value: us
       - key: SUGGEST_DELAY_SECONDS
         value: "1.0"
       - key: SUGGEST_TIMEOUT_SECONDS
         value: "5.0"
       - key: SUGGEST_MAX_RETRIES
         value: "2"
-      - key: SUGGEST_QUESTION_MODIFIERS
-        value: who,what,when,where,why,how
-      - key: SUGGEST_COMMERCIAL_MODIFIERS
-        value: best,buy,cheap,near me
 
       # ---- Limits and logging ----
       - key: RATE_LIMIT_MAX_SEARCHES
