@@ -348,7 +348,7 @@ async def test_password_with_special_characters_round_trips():
     from app.auth import authenticate, get_session_store
     from app.config import Settings
 
-    tricky = "5A7SopkUr%Nd$x#y!z"
+    tricky = "pW%25rd$with#odd!chars&more"
     settings = Settings(ADMIN_USERNAME="admin", ADMIN_PASSWORD=tricky, GEMINI_API_KEY="k")
     assert settings.ADMIN_PASSWORD == tricky
 
