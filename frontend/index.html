@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keyword Suggest &amp; Intent Analyzer</title>
+<meta name="description" content="Internal tool: turn a seed topic into a Google-autocomplete keyword set and a Gemini search-intent report.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="lib-load-error" class="lib-error hidden" role="alert">
+  The Markdown rendering library failed to load, so the AI report cannot be displayed safely. Check your connection and refresh the page. Raw keyword data is not affected.
+</div>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<!-- ============ Sign-in gate ============ -->
+<section id="gate-screen" class="gate-screen">
+  <div class="gate-card">
+    <h1 class="brand-title">Keyword Suggest &amp; Intent Analyzer</h1>
+    <p class="gate-sub">Internal tool &middot; sign in with your admin credentials to continue.</p>
+    <form id="gate-form" novalidate>
+      <label for="gate-username">Username</label>
+      <input id="gate-username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      <label for="gate-password">Password</label>
+      <input id="gate-password" name="password" type="password" autocomplete="current-password" required>
+      <div id="gate-error" class="field-error hidden" role="alert"></div>
+      <button id="gate-submit" type="submit" class="btn btn-primary">Sign in</button>
+    </form>
+  </div>
+</section>
+
+<!-- ============ App shell ============ -->
+<div id="app" class="hidden">
+  <header class="app-header">
+    <div class="brand">Keyword Suggest <span class="brand-suffix">&amp; Intent Analyzer</span></div>
+    <div class="header-right">
+      <span id="quota-line" class="quota-line" aria-live="polite"></span>
+      <button id="logout-btn" type="button" class="btn-link">Log out</button>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <form id="topic-form" class="panel topic-form" novalidate>
+      <label for="topic-input">Seed topic</label>
+      <div class="topic-row">
+        <input id="topic-input" name="topic" type="text" maxlength="100" placeholder="e.g. luxury villa rentals" autocomplete="off">
+        <button id="run-btn" type="submit" class="btn btn-primary" style="margin-top:0;">Run Analysis</button>
+      </div>
+      <div id="topic-error" class="field-error hidden" role="alert"></div>
+      <button type="button" id="example-btn" class="btn-chip">Try an example: luxury villa rentals</button>
+    </form>
+
+    <div id="status-region" class="status-region hidden">
+
+      <p id="run-note" class="hidden" aria-live="polite"></p>
+
+      <div id="running-status" class="running-status hidden" aria-live="polite">
+        <p id="running-message"></p>
+        <p class="elapsed-line"><span id="elapsed-value">0</span>s elapsed</p>
+        <button id="cancel-btn" type="button" class="btn btn-secondary" style="align-self:flex-start;">Cancel</button>
+      </div>
+
+      <div id="error-banner" class="banner banner-danger hidden" role="alert">
+        <div class="banner-body">
+          <div id="error-title" class="banner-title"></div>
+          <p id="error-message"></p>
+          <div id="error-countdown" class="hidden"></div>
+        </div>
+        <button id="error-action-btn" type="button" class="btn btn-secondary hidden"></button>
+      </div>
+
+    </div>
+
+    <section id="results" class="hidden" aria-labelledby="results-topic">
+      <div class="results-header">
+        <div>
+          <span class="eyebrow">Results for<span id="cached-badge" class="badge badge-info hidden">Cached result</span></span>
+          <h1 id="results-topic"></h1>
+        </div>
+        <div class="results-actions">
+          <button id="download-report-btn" type="button" class="btn btn-secondary">Download report (.md)</button>
+          <button id="download-csv-btn" type="button" class="btn btn-secondary">Download keywords (.csv)</button>
+        </div>
+      </div>
+
+      <div class="stat-strip">
+        <div class="stat-cell">
+          <span class="stat-label">Unique keywords</span>
+          <span id="stat-total" class="stat-value"></span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Queries succeeded</span>
+          <span id="stat-queries" class="stat-value"></span>
+        </div>
+        <div class="stat-cell">
+          <span class="stat-label">Duration</span>
+          <span id="stat-duration" class="stat-value"></span>
+        </div>
+      </div>
+
+      <div id="partial-banner" class="banner banner-warning hidden">
+        <div class="banner-body">
+          <div id="partial-title" class="banner-title"></div>
+          <p>Google limited some of our requests. Everything shown is real data, just a little thinner than a full run.</p>
+          <details>
+            <summary>View failed queries</summary>
+            <ul id="failed-queries-list"></ul>
+          </details>
+        </div>
+      </div>
+
+      <div role="tablist" class="tabs" aria-label="Results view">
+        <button id="tab-report" type="button" role="tab" aria-selected="true" aria-controls="panel-report" class="tab-btn">AI report</button>
+        <button id="tab-raw" type="button" role="tab" aria-selected="false" aria-controls="panel-raw" class="tab-btn">Raw keywords</button>
+      </div>
+
+      <div id="panel-report" role="tabpanel" aria-labelledby="tab-report" tabindex="0">
+        <button id="copy-report-btn" type="button" class="btn btn-secondary" style="align-self:flex-start;">Copy report</button>
+        <div id="report-body" class="report-body"></div>
+      </div>
+
+      <div id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" tabindex="0" class="hidden">
+        <div class="raw-toolbar">
+          <input id="raw-filter" type="text" placeholder="Filter keywords&hellip;" aria-label="Filter keywords">
+          <div class="segmented" role="group" aria-label="Raw keyword view">
+            <button id="mode-grouped" type="button" aria-pressed="true">Grouped by source query</button>
+            <button id="mode-flat" type="button" aria-pressed="false">Flat unique list</button>
+          </div>
+          <button id="copy-all-btn" type="button" class="btn btn-secondary">Copy all keywords</button>
+        </div>
+        <p id="filter-summary" aria-live="polite"></p>
+        <div id="group-view"></div>
+        <div id="flat-view" class="hidden"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script
+  src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"
+  integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi"
+  crossorigin="anonymous"
+  onerror="window.__libLoadFailed = true"></script>
+<script
+  src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"
+  integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a"
+  crossorigin="anonymous"
+  onerror="window.__libLoadFailed = true"></script>
+<script src="app.js"></script>
+</body>
+</html>

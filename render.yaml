@@ -1,0 +1,72 @@
+# Render blueprint. One web service serves both the API and the static
+# frontend, so the UI and the API share an origin.
+#
+# Values marked `sync: false` are secrets: Render prompts for them on first
+# deploy and never stores them in this file or in git.
+services:
+  - type: web
+    name: keyword-intent-analyzer
+    runtime: python
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+
+      # ---- Mode ----
+      - key: MODE
+        value: prod
+
+      # ---- Access ----
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false          # secret
+      - key: SESSION_TTL_HOURS
+        value: "12"
+      - key: API_KEY
+        sync: false          # secret
+      - key: ALLOWED_ORIGINS
+        sync: false          # set to this service's public URL
+
+      # ---- AI ----
+      - key: GEMINI_API_KEY
+        sync: false          # secret
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+      - key: GEMINI_TIMEOUT_SECONDS
+        value: "120"
+      - key: MAX_KEYWORDS_IN_PROMPT
+        value: "600"
+
+      # ---- Collection ----
+      - key: SUGGEST_LANG
+        value: en
+      - key: SUGGEST_COUNTRY
+        value: us
+      - key: SUGGEST_DELAY_SECONDS
+        value: "1.0"
+      - key: SUGGEST_TIMEOUT_SECONDS
+        value: "5.0"
+      - key: SUGGEST_MAX_RETRIES
+        value: "2"
+      - key: SUGGEST_QUESTION_MODIFIERS
+        value: who,what,when,where,why,how
+      - key: SUGGEST_COMMERCIAL_MODIFIERS
+        value: best,buy,cheap,near me
+
+      # ---- Limits and logging ----
+      - key: RATE_LIMIT_MAX_SEARCHES
+        value: "10"
+      - key: RATE_LIMIT_WINDOW_MINUTES
+        value: "60"
+      - key: CACHE_TTL_MINUTES
+        value: "1440"
+      - key: CACHE_MAX_ENTRIES
+        value: "50"
+      - key: LOG_LEVEL
+        value: INFO
