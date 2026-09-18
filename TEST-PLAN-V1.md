@@ -3,11 +3,13 @@
 Traced line by line to **the client's developer briefing** (`.docx`) and **the
 approved scope** (`PE_PS_1vs1 — Keyword Analyzer`, 16 Sep 2026).
 
-Every test below names the promise it proves. Pass all of Part A and the
-contract is met.
+Every test below names the promise it proves. Pass Part A and the contract is
+met; Part E covers both locales the briefing implies, and **Part F is how you
+prove the keywords are genuinely Google's** rather than taking it on trust.
 
 **Before starting:** sign in. The meter top-right shows runs left — ten per
-hour, shared across the team. Part A costs four runs. Parts B–D cost none.
+hour, shared across the team. Part A costs four runs and Part E costs four
+more, so allow two hours or raise the limit. Parts B, C, D and F cost none.
 
 ---
 
@@ -20,7 +22,8 @@ hour, shared across the team. Part A costs four runs. Parts B–D cost none.
 > and *"AI report … covering intent, topic groups, patterns and content ideas"*.
 > Uses `Football Statistics` — the default topic in the client's own HTML.
 
-**Type:** `football statistics` → **Run analysis**
+**Set Market to `English · United States`**, type `football statistics`, then
+**Run analysis**.
 
 **Expect during the run:** *Running*, an orange progress bar, a live seconds
 counter, **Cancel run**. Roughly 40 seconds.
@@ -166,75 +169,165 @@ On the Intent report tab:
 
 ---
 
-## Part E — The two decisions to settle before handover
+## Part E — Markets (English and German side by side)
 
-These are **not bugs**. They are two places where what is running differs
-from the client's briefing, and the client should choose.
+> **Proves:** the tool matches the briefing for **both** locales. The client's
+> reference code assumed German/Swiss (`language: "de"`, `country: "ch"`,
+> question words `wer, wie, was, wo, warum, welche`); their own webpage sent
+> English/US. Rather than pick one, the locale is now chosen per run.
 
-### E1 · Language and country — **needs a decision**
+### E1 · The picker is there and says what it changes
 
-The client's code sets `language: str = "de"`, `country: str = "ch"` and uses
-**German question words** — `wer, wie, was, wo, warum, welche, beste, mieten`.
-What is deployed uses **English / US** — `who, what, when, where, why, how,
-best, buy, cheap, near me`.
+| Check | Expect | Pass |
+|---|---|---|
+| The query bar has a **Market** dropdown | Two options: *English · United States* and *Deutsch · Schweiz* | ☐ |
+| Select **English · United States** | The line under the bar reads `hl=en` `gl=us` and shows `who what when where why how best buy cheap near me` | ☐ |
+| Select **Deutsch · Schweiz** | The line changes to `hl=de` `gl=ch` and `wer wie was wo warum welche beste mieten buy best` — **the briefing's own word list** | ☐ |
+| **Queries** still reads **37** in both | Switching market costs nothing in speed or quota | ☐ |
+| Refresh the page | Your market choice is still selected | ☐ |
 
-> Note their own HTML overrides this to `en` / `us`, so the briefing
-> contradicts itself. This is genuinely the client's call.
+### E2 · A German run returns German results
 
-**The test that settles it — run this and compare:**
+**Set Market to `Deutsch · Schweiz`**, type `chalet zermatt mieten`, **Run analysis**.
 
-1. Run `chalet zermatt mieten` as-is (English/US settings).
-2. Note the **Unique keywords** count and whether the 10 modifier rows
-   returned anything.
-3. If the modifier rows are mostly empty and the count is low, the client
-   works in German and the setting should change.
+| Check | Expect | Pass |
+|---|---|---|
+| Keywords tab → **Grouped** | Rows named `wie chalet zermatt mieten`, `warum chalet zermatt mieten`, `beste chalet zermatt mieten` — **German prefixes, not English** | ☐ |
+| Open those rows | Suggestions in German (`chalet zermatt mieten günstig`, `… mit sauna`) | ☐ |
+| Under the topic title | It names **Deutsch · Schweiz** | ☐ |
+| Umlauts render correctly everywhere | `günstig`, `größe` — not `gÃ¼nstig` | ☐ |
+| The AI report | Written in **English**, with the four headings unchanged, but **quoting the German keywords as-is** — never translated | ☐ |
 
-**If it needs changing**, it is four environment variables in Render — no
-code, no redeploy of the frontend:
+### E3 · The two markets do not contaminate each other
 
-```
-SUGGEST_LANG=de
-SUGGEST_COUNTRY=ch
-SUGGEST_QUESTION_MODIFIERS=wer,wie,was,wo,warum,welche
-SUGGEST_COMMERCIAL_MODIFIERS=beste,mieten,buy,best
-```
+Run **the same topic** `chalet zermatt` twice — once on each market.
 
-That is the client's exact modifier list, and it keeps the total at 37 queries.
+| Check | Expect | Pass |
+|---|---|---|
+| The second run is a **real run** | No **Cached** badge; it takes ~40s again | ☐ |
+| The two keyword lists differ | German modifier rows in one, English in the other | ☐ |
+| Each result names its own market | One says *English · United States*, one says *Deutsch · Schweiz* | ☐ |
+| Download both as TXT | Each file's header line names the market it came from | ☐ |
 
-### E2 · Which AI writes the report — **tell the client**
+> A cached English answer being served to a German run would be the serious
+> bug here. E3 is the test that would catch it.
+
+### E4 · Which AI writes the report — **tell the client**
 
 The scope says *"AI report from **Gemini**"*. What is deployed tries
 **Claude → OpenAI → Gemini** and uses whichever answers first, naming it above
 the report.
 
-**This is an upgrade, not a substitution**, and it costs nothing to leave as
-is: a provider with no API key is skipped without being called. **If the
-client sets only `GEMINI_API_KEY` — which is what their briefing assumes —
-the tool runs Gemini and nothing else.** The other two are a safety net for
-the day Gemini is down.
+**This is an upgrade, not a substitution.** A provider with no API key is
+skipped without being called, so **if the client sets only `GEMINI_API_KEY` —
+which is what their briefing assumes — the tool runs Gemini and nothing
+else.** The other two are a safety net for the day Gemini is down.
 
 **Test it:** run any topic and read the line above the report. With only a
 Gemini key configured it must say **Gemini**. Say so to the client anyway —
-they approved "Gemini", and they should hear this from you first.
+they approved "Gemini" and should hear this from you first.
 
 ---
 
-## Part F — The one thing nobody can test until it is live
+## Part F — Proving the data is really Google's
 
-Every test above except this one has been run. **No real Google request has
-been made yet** — all development testing used simulated responses.
+> This is the question that matters most, so it gets its own answer rather
+> than a promise.
 
-The first genuine Google call happens on Render, with the client watching.
-This is expected, and your scope §05 already discloses it:
+### F1 · Run the proof script
+
+On your own machine, with normal internet:
+
+```bash
+cd backend && source .venv/bin/activate
+python scripts/verify_live.py "ski chalet zermatt"
+python scripts/verify_live.py "chalet zermatt mieten" --market de-CH
+```
+
+**What it does:** asks Google directly, using **only Python's standard
+library and not one line of this project's code**, then asks the same
+question through the app's own collection path, and compares.
+
+**What you will see:**
+
+- The **raw bytes Google sent back**, printed. Not a summary — the actual
+  response, so you can read it yourself.
+- Google's suggestions, listed.
+- The app's suggestions for the same query, listed.
+- A verdict.
+
+**Pass:** `✓ Every keyword the app recorded came from Google.`
+
+**Fail:** the script names any keyword the app produced that Google did not,
+and exits non-zero. That would be the tool inventing data. It should never
+happen — if it does, stop and send me the output.
+
+> Some keywords appearing in one list and not the other **in that direction**
+> is normal: Google's autocomplete is not deterministic, and two calls a
+> second apart can differ. Only **extra** keywords in the app's list would
+> prove fabrication, which is exactly what the script tests for.
+
+Add `--full` to run the complete 37-query set (~40 seconds) — the honest
+end-to-end check.
+
+### F2 · Confirm you are not looking at demo data
+
+The app has a demo mode that serves a saved sample instead of calling Google.
+It is deliberately impossible to mistake:
+
+| Check | Expect | Pass |
+|---|---|---|
+| Open the app **normally** | **No banner.** This is a real run. | ☐ |
+| Open it with `?mock=1` on the end of the address | A **black banner with an orange edge**: *"Demo mode. These keywords are a saved sample, not a live Google result."* | ☐ |
+| The account chip in the corner | Reads `M` and *"(mock)"* in demo mode, `A` in a real session | ☐ |
+
+**If you see no banner, the keywords came from Google.** There is no third
+state and no partial-demo mode.
+
+### F3 · What a real run proves on its own
+
+Without running any script, a genuine run is self-evidencing:
+
+- **It takes ~40 seconds.** Fabricated data would be instant. The time is 37
+  real HTTP requests, paced one per second.
+- **The Keywords tab shows the exact query that produced each keyword.** Type
+  any of those queries into Google yourself and compare.
+- **Some queries sometimes fail**, and the tool says which. Invented data
+  never fails.
+- **Results differ between markets**, because Google genuinely answers `hl=de`
+  differently from `hl=en`.
+
+### F4 · Where the AI does and does not touch the data
+
+Worth being precise, because this is what "AI data" would mean:
+
+| Stage | Who produces it |
+|---|---|
+| The 37 queries | Built from your topic by the app |
+| The keywords | **Google, and only Google** |
+| Dedupe, grouping, counts | The app, arithmetic only |
+| The written report | The AI — prose *about* the keywords |
+
+**The AI is handed the finished keyword list and writes prose about it. It
+never adds to that list, and there is no code path by which it could.** The
+counts, the intent-mix percentages and every keyword you download are
+Google's data and the app's arithmetic.
+
+### F5 · The one caveat that remains
+
+Development testing used simulated Google responses, because the build
+environment cannot reach Google at all. **F1 is how you close that gap
+yourself, in about a minute**, before the client sees it.
+
+Your scope §05 already discloses the related risk:
 
 > *"Hosting online makes blocks more likely. Render's servers share addresses
 > with many sites, and Google limits shared addresses sooner, so occasional
 > partial runs are possible."*
 
-**So: run A1 on the live Render URL yourself, before the client does.** If it
-returns 37/37, you are clear. If it returns partial, that is the accepted risk
-in §05 doing exactly what you said it would — and the fix is the paid data
-service already quoted under §07.
+So run **A1 and F1 on the live Render URL** yourself first. 37/37 and a ✓ and
+you are clear. A partial run is §05 behaving exactly as you described it, and
+the fix is the paid data service already quoted under §07.
 
 ---
 
@@ -250,5 +343,10 @@ service already quoted under §07.
 | Short setup guide | §03 | `DEPLOYMENT.md` |
 | Exclusions stay excluded | §03 | Confirmed absent |
 | Delivery Friday 18 September | cover | On time |
+| German/Swiss locale from the briefing | briefing | Built — selectable per run, alongside English/US |
+| Keywords are genuinely Google's | — | Provable in a minute: `scripts/verify_live.py` |
 
-**Two open decisions:** language/country (E1) and which AI writes the report (E2).
+**One thing to tell the client:** the report now tries Claude first with
+Gemini as backup, rather than Gemini alone (E4). It costs nothing, changes
+nothing if only a Gemini key is set, and is an upgrade — but they approved
+"Gemini", so it should come from you.
