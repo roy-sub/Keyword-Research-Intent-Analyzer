@@ -281,7 +281,7 @@ def test_root_returns_a_service_descriptor(client):
     response = test_client.get("/")
     assert response.status_code == 200
     body = response.json()
-    assert body["service"] == "keyword-suggest-intent-analyzer-api"
+    assert body["service"] == "refract-api"
     assert body["status"] == "ok"
     assert provider.calls == 0
     assert analyzer.calls == 0

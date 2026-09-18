@@ -104,7 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     docs_enabled = not settings.is_prod
 
     app = FastAPI(
-        title="Keyword Suggest & Intent Analyzer",
+        title="Refract API",
         version="1.0.0",
         lifespan=lifespan,
         docs_url="/docs" if docs_enabled else None,
@@ -136,7 +136,7 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
         """A small descriptor, so hitting the API host in a browser explains
         itself instead of returning a bare 404. The UI lives elsewhere."""
         return ServiceInfo(
-            service="keyword-suggest-intent-analyzer-api",
+            service="refract-api",
             status="ok",
             docs="/docs" if not get_settings().is_prod else None,
         )

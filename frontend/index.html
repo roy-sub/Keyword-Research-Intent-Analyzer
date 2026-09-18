@@ -3,141 +3,422 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Keyword Suggest &amp; Intent Analyzer</title>
-<meta name="description" content="Internal tool: turn a seed topic into a Google-autocomplete keyword set and a Gemini search-intent report.">
+<title>Refract — Keyword Intent Intelligence</title>
+<meta name="description" content="Refract turns a seed topic into the full spectrum of search intent: real autocomplete demand, grouped by source, analysed by AI.">
+<meta name="theme-color" content="#F6F5F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D0E10" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2316171B'/%3E%3Cpath d='M16 7.2 27 26H5z' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='19.7' r='2.4' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-<div id="lib-load-error" class="lib-error hidden" role="alert">
-  The Markdown rendering library failed to load, so the AI report cannot be displayed safely. Check your connection and refresh the page. Raw keyword data is not affected.
+<!-- ===================== Icon sprite =====================
+     One system: 20x20 box, 1.5 stroke, round caps and joins.
+     ======================================================= -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <defs>
+    <g id="i-search"><circle cx="9" cy="9" r="5.5"/><path d="m13.2 13.2 3.3 3.3"/></g>
+    <g id="i-arrow-right"><path d="M4 10h11.5M11 5.5 15.5 10 11 14.5"/></g>
+    <g id="i-sparkle"><path d="M10 3.2 11.6 7.6 16 9.2l-4.4 1.6L10 15.2 8.4 10.8 4 9.2l4.4-1.6zM15.4 13.8l.6 1.6 1.6.6-1.6.6-.6 1.6-.6-1.6-1.6-.6 1.6-.6z"/></g>
+    <g id="i-layers"><path d="M10 3.2 3.4 6.6 10 10l6.6-3.4zM3.4 10.4 10 13.8l6.6-3.4M3.4 13.9 10 17.3l6.6-3.4"/></g>
+    <g id="i-list"><path d="M7 5.6h9.5M7 10h9.5M7 14.4h9.5M3.7 5.6h.01M3.7 10h.01M3.7 14.4h.01"/></g>
+    <g id="i-filter"><path d="M3.4 4.8h13.2l-5.1 6v5l-3-1.6v-3.4z"/></g>
+    <g id="i-download"><path d="M10 3.4v9M6.4 9l3.6 3.6L13.6 9M3.8 15.4h12.4"/></g>
+    <g id="i-copy"><rect x="7" y="7" width="9.4" height="9.4" rx="1.6"/><path d="M13 4.6H5.2A1.6 1.6 0 0 0 3.6 6.2V14"/></g>
+    <g id="i-check"><path d="m4.2 10.4 4 4 7.6-8.8"/></g>
+    <g id="i-close"><path d="m5.2 5.2 9.6 9.6M14.8 5.2l-9.6 9.6"/></g>
+    <g id="i-logout"><path d="M12.6 14.2v1.6a1.6 1.6 0 0 1-1.6 1.6H4.8a1.6 1.6 0 0 1-1.6-1.6V4.2a1.6 1.6 0 0 1 1.6-1.6H11a1.6 1.6 0 0 1 1.6 1.6v1.6M8.4 10h8.4M14 7.2 16.8 10 14 12.8"/></g>
+    <g id="i-alert"><path d="M10 2.8 18 16.6H2z"/><path d="M10 8v3.4M10 14h.01"/></g>
+    <g id="i-info"><circle cx="10" cy="10" r="7.4"/><path d="M10 13.4V9.6M10 6.8h.01"/></g>
+    <g id="i-clock"><circle cx="10" cy="10" r="7.4"/><path d="M10 5.8V10l2.8 1.7"/></g>
+    <g id="i-refresh"><path d="M16.6 8.4A6.8 6.8 0 0 0 5 5.6L3.4 7.2M3.4 11.6a6.8 6.8 0 0 0 11.6 2.8l1.6-1.6"/><path d="M3.4 3.6v3.6H7M16.6 16.4v-3.6H13"/></g>
+    <g id="i-chevron-down"><path d="m5.6 8 4.4 4.4L14.4 8"/></g>
+    <g id="i-chevron-right"><path d="m8 5.6 4.4 4.4L8 14.4"/></g>
+    <g id="i-hash"><path d="M7.6 3.6 6 16.4M14 3.6l-1.6 12.8M3.8 7.4h12.6M3.2 12.6h12.6"/></g>
+    <g id="i-lock"><rect x="4" y="8.6" width="12" height="8.4" rx="1.8"/><path d="M6.8 8.6V6.4a3.2 3.2 0 0 1 6.4 0v2.2"/></g>
+    <g id="i-target"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2.6"/></g>
+  </defs>
+</svg>
+
+<a class="skip-link" href="#workspace">Skip to main content</a>
+
+<div id="lib-load-error" class="lib-banner is-hidden" role="alert">
+  <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-alert"/></svg>
+  <span>The Markdown renderer could not load, so the AI report is shown as plain text. Keyword data is unaffected.</span>
 </div>
 
-<a class="skip-link" href="#main">Skip to main content</a>
+<!-- ============================= Sign-in ============================= -->
+<div id="gate-screen" class="gate">
 
-<!-- ============ Sign-in gate ============ -->
-<section id="gate-screen" class="gate-screen">
-  <div class="gate-card">
-    <h1 class="brand-title">Keyword Suggest &amp; Intent Analyzer</h1>
-    <p class="gate-sub">Internal tool &middot; sign in with your admin credentials to continue.</p>
-    <form id="gate-form" novalidate>
-      <label for="gate-username">Username</label>
-      <input id="gate-username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-      <label for="gate-password">Password</label>
-      <input id="gate-password" name="password" type="password" autocomplete="current-password" required>
-      <div id="gate-error" class="field-error hidden" role="alert"></div>
-      <button id="gate-submit" type="submit" class="btn btn-primary">Sign in</button>
-    </form>
-  </div>
-</section>
+  <aside class="gate__brand">
+    <div class="gate__brand-mark">
+      <div class="lockup lockup--invert">
+        <span class="lockup__mark">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4.2 20.4 19.4H3.6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="12" cy="14.3" r="1.85" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="lockup__word">Refract</span>
+      </div>
+    </div>
 
-<!-- ============ App shell ============ -->
-<div id="app" class="hidden">
-  <header class="app-header">
-    <div class="brand">Keyword Suggest <span class="brand-suffix">&amp; Intent Analyzer</span></div>
-    <div class="header-right">
-      <span id="quota-line" class="quota-line" aria-live="polite"></span>
-      <button id="logout-btn" type="button" class="btn-link">Log out</button>
+    <div class="gate__brand-inner">
+      <p class="gate__display">One&nbsp;topic in.<br>The&nbsp;whole spectrum&nbsp;out.</p>
+      <p class="gate__lede">Refract splits a seed topic into thousands of real autocomplete queries, keeps the source of every one, and reads the intent behind them.</p>
+
+      <ul class="gate__facts">
+        <li><span class="fact__n">37</span><span class="fact__l">queries per run</span></li>
+        <li><span class="fact__n">4</span><span class="fact__l">intent classes</span></li>
+        <li><span class="fact__n">100%</span><span class="fact__l">source-attributed</span></li>
+      </ul>
+    </div>
+  </aside>
+
+  <main class="gate__panel">
+    <div class="gate__form-wrap">
+      <div class="lockup lockup--sm gate__mobile-lockup">
+        <span class="lockup__mark">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4.2 20.4 19.4H3.6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="12" cy="14.3" r="1.85" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="lockup__word">Refract</span>
+      </div>
+
+      <p class="eyebrow"><span class="eyebrow__dot"></span>Restricted access</p>
+      <h1 class="gate__title">Sign in</h1>
+      <p class="gate__sub">This workspace is limited to a single administrator account.</p>
+
+      <form id="gate-form" novalidate>
+        <div class="field">
+          <label class="label" for="gate-username">Username</label>
+          <input class="input" id="gate-username" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        </div>
+
+        <div class="field">
+          <label class="label" for="gate-password">Password</label>
+          <input class="input" id="gate-password" name="password" type="password" autocomplete="current-password" required>
+        </div>
+
+        <div id="gate-error" class="form-error is-hidden" role="alert">
+          <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-alert"/></svg>
+          <span id="gate-error-text"></span>
+        </div>
+
+        <button id="gate-submit" type="submit" class="btn btn--primary btn--block btn--lg">
+          <span class="btn__label">Sign in</span>
+          <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+        </button>
+      </form>
+
+      <p class="gate__foot">
+        <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-lock"/></svg>
+        Sessions are held in memory and expire automatically.
+      </p>
+    </div>
+  </main>
+</div>
+
+<!-- ============================== App ============================== -->
+<div id="app" class="app is-hidden">
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="lockup lockup--sm">
+        <span class="lockup__mark">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 4.2 20.4 19.4H3.6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <circle cx="12" cy="14.3" r="1.85" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="lockup__word">Refract</span>
+        <span class="lockup__tag">Intent</span>
+      </div>
+
+      <div class="topbar__right">
+        <div class="quota" id="quota" title="Shared hourly search quota">
+          <div class="quota__meter" aria-hidden="true"><span id="quota-fill" class="quota__fill"></span></div>
+          <span id="quota-line" class="quota__text" aria-live="polite"></span>
+        </div>
+
+        <div class="menu">
+          <button id="account-btn" type="button" class="account" aria-haspopup="menu" aria-expanded="false" aria-controls="account-menu">
+            <span class="account__avatar" id="account-initial">A</span>
+            <svg class="icon account__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+          </button>
+          <div id="account-menu" class="menu__panel is-hidden" role="menu" aria-labelledby="account-btn">
+            <div class="menu__head">
+              <span class="menu__label">Signed in as</span>
+              <span class="menu__value" id="account-name">admin</span>
+            </div>
+            <button id="logout-btn" type="button" class="menu__item" role="menuitem">
+              <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-logout"/></svg>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </header>
 
-  <main id="main">
+  <main id="workspace" class="workspace">
 
-    <form id="topic-form" class="panel topic-form" novalidate>
-      <label for="topic-input">Seed topic</label>
-      <div class="topic-row">
-        <input id="topic-input" name="topic" type="text" maxlength="100" placeholder="e.g. luxury villa rentals" autocomplete="off">
-        <button id="run-btn" type="submit" class="btn btn-primary" style="margin-top:0;">Run Analysis</button>
+    <!-- ---------- Query bar ---------- -->
+    <form id="topic-form" class="query" novalidate>
+      <div class="query__seg query__seg--main">
+        <label class="query__label" for="topic-input">Seed topic</label>
+        <div class="query__input-row">
+          <svg class="icon query__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-search"/></svg>
+          <input id="topic-input" class="query__input" name="topic" type="text" maxlength="100"
+                 placeholder="luxury villa rentals" autocomplete="off" spellcheck="false">
+        </div>
       </div>
-      <div id="topic-error" class="field-error hidden" role="alert"></div>
-      <button type="button" id="example-btn" class="btn-chip">Try an example: luxury villa rentals</button>
+
+      <div class="query__seg query__seg--meta">
+        <span class="query__label">Queries</span>
+        <span class="query__value" id="meta-queries">—</span>
+      </div>
+
+      <div class="query__seg query__seg--meta">
+        <span class="query__label">Pacing</span>
+        <span class="query__value" id="meta-pacing">—</span>
+      </div>
+
+      <div class="query__action">
+        <button id="run-btn" type="submit" class="btn btn--primary btn--lg btn--block">
+          <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-sparkle"/></svg>
+          <span class="btn__label">Run analysis</span>
+        </button>
+      </div>
     </form>
 
-    <div id="status-region" class="status-region hidden">
+    <p id="topic-error" class="form-error form-error--loose is-hidden" role="alert">
+      <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-alert"/></svg>
+      <span id="topic-error-text"></span>
+    </p>
 
-      <p id="run-note" class="hidden" aria-live="polite"></p>
+    <!-- ---------- Transient status ---------- -->
+    <section id="status-region" class="status-region is-hidden" aria-label="Run status">
 
-      <div id="running-status" class="running-status hidden" aria-live="polite">
-        <p id="running-message"></p>
-        <p class="elapsed-line"><span id="elapsed-value">0</span>s elapsed</p>
-        <button id="cancel-btn" type="button" class="btn btn-secondary" style="align-self:flex-start;">Cancel</button>
-      </div>
+      <p id="run-note" class="note is-hidden" aria-live="polite"></p>
 
-      <div id="error-banner" class="banner banner-danger hidden" role="alert">
-        <div class="banner-body">
-          <div id="error-title" class="banner-title"></div>
-          <p id="error-message"></p>
-          <div id="error-countdown" class="hidden"></div>
+      <div id="running-status" class="run-panel is-hidden" aria-live="polite">
+        <div class="run-panel__head">
+          <p class="eyebrow"><span class="eyebrow__dot eyebrow__dot--live"></span>Running</p>
+          <span class="run-panel__elapsed"><span id="elapsed-value">0</span>s</span>
         </div>
-        <button id="error-action-btn" type="button" class="btn btn-secondary hidden"></button>
-      </div>
-
-    </div>
-
-    <section id="results" class="hidden" aria-labelledby="results-topic">
-      <div class="results-header">
-        <div>
-          <span class="eyebrow">Results for<span id="cached-badge" class="badge badge-info hidden">Cached result</span></span>
-          <h1 id="results-topic"></h1>
+        <p id="running-message" class="run-panel__stage"></p>
+        <div class="progress" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100">
+          <span id="run-progress" class="progress__fill"></span>
         </div>
-        <div class="results-actions">
-          <button id="download-report-btn" type="button" class="btn btn-secondary">Download report (.md)</button>
-          <button id="download-csv-btn" type="button" class="btn btn-secondary">Download keywords (.csv)</button>
+        <div class="run-panel__foot">
+          <span class="run-panel__hint">Requests are paced to stay within Google's limits.</span>
+          <button id="cancel-btn" type="button" class="btn btn--ghost btn--sm">Cancel run</button>
         </div>
       </div>
 
-      <div class="stat-strip">
-        <div class="stat-cell">
-          <span class="stat-label">Unique keywords</span>
-          <span id="stat-total" class="stat-value"></span>
+      <div id="error-banner" class="alert alert--danger is-hidden" role="alert">
+        <svg class="icon alert__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-alert"/></svg>
+        <div class="alert__body">
+          <p id="error-title" class="alert__title"></p>
+          <p id="error-message" class="alert__text"></p>
+          <div id="error-countdown" class="countdown is-hidden">
+            <div class="progress progress--thin"><span id="countdown-fill" class="progress__fill"></span></div>
+            <span id="countdown-value" class="countdown__value"></span>
+          </div>
         </div>
-        <div class="stat-cell">
-          <span class="stat-label">Queries succeeded</span>
-          <span id="stat-queries" class="stat-value"></span>
-        </div>
-        <div class="stat-cell">
-          <span class="stat-label">Duration</span>
-          <span id="stat-duration" class="stat-value"></span>
+        <button id="error-action-btn" type="button" class="btn btn--secondary btn--sm is-hidden"></button>
+      </div>
+    </section>
+
+    <!-- ---------- Empty state ---------- -->
+    <section id="empty-state" class="empty">
+      <div class="empty__copy">
+        <p class="eyebrow"><span class="eyebrow__dot"></span>How it works</p>
+        <h1 class="empty__display">Refract a topic into<br>its search intent.</h1>
+        <p class="empty__lede">Enter a seed topic above. Refract runs 37 paced autocomplete queries — the seed alone, every letter a&nbsp;to&nbsp;z, and question and commercial modifiers — then merges the results and reads the intent behind them.</p>
+        <div class="empty__chips">
+          <span class="empty__chips-label">Try</span>
+          <button type="button" class="chip-btn" data-topic="luxury villa rentals">luxury villa rentals</button>
+          <button type="button" class="chip-btn" data-topic="protein powder">protein powder</button>
+          <button type="button" class="chip-btn" data-topic="crm software">crm software</button>
         </div>
       </div>
 
-      <div id="partial-banner" class="banner banner-warning hidden">
-        <div class="banner-body">
-          <div id="partial-title" class="banner-title"></div>
-          <p>Google limited some of our requests. Everything shown is real data, just a little thinner than a full run.</p>
-          <details>
-            <summary>View failed queries</summary>
-            <ul id="failed-queries-list"></ul>
+      <div class="empty__viz" aria-hidden="true">
+        <svg viewBox="0 0 264 180" fill="none">
+          <path d="M6 74h92" class="viz-beam"/>
+          <circle cx="104" cy="74" r="3.6" class="viz-dot"/>
+          <path d="M128 30 192 142H64z" class="viz-prism"/>
+          <path d="M156 74 252 44" class="viz-ray viz-ray--seed"/>
+          <path d="M156 74 252 64" class="viz-ray viz-ray--alphabet"/>
+          <path d="M156 74 252 84" class="viz-ray viz-ray--question"/>
+          <path d="M156 74 252 104" class="viz-ray viz-ray--commercial"/>
+        </svg>
+      </div>
+    </section>
+
+    <!-- ---------- Results ---------- -->
+    <section id="results" class="results is-hidden" aria-labelledby="results-topic">
+
+      <header class="results__head">
+        <div class="results__title">
+          <p class="eyebrow">
+            <span class="eyebrow__dot"></span>Analysis
+            <span id="cached-badge" class="badge badge--cached is-hidden">
+              <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-clock"/></svg>Cached
+            </span>
+          </p>
+          <h1 id="results-topic" class="results__display"></h1>
+          <p class="results__meta">
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-clock"/></svg>
+            <span id="generated-at"></span>
+          </p>
+        </div>
+
+        <div class="results__actions">
+          <div class="menu">
+            <button id="export-btn" type="button" class="btn btn--secondary" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu">
+              <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-download"/></svg>
+              <span class="btn__label">Export</span>
+              <svg class="icon btn__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+            </button>
+            <div id="export-menu" class="menu__panel menu__panel--right is-hidden" role="menu" aria-labelledby="export-btn">
+              <button id="download-csv-btn" type="button" class="menu__item" role="menuitem">
+                <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-list"/></svg>
+                <span>Keywords<span class="menu__hint">.csv</span></span>
+              </button>
+              <button id="download-report-btn" type="button" class="menu__item" role="menuitem">
+                <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-sparkle"/></svg>
+                <span>Intent report<span class="menu__hint">.md</span></span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Metrics -->
+      <div class="metrics">
+        <div class="metric">
+          <span class="metric__label">Unique keywords</span>
+          <span id="stat-total" class="metric__value">—</span>
+          <span id="stat-total-sub" class="metric__sub">&nbsp;</span>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Queries succeeded</span>
+          <span id="stat-queries" class="metric__value">—</span>
+          <div class="metric__bar" aria-hidden="true"><span id="queries-fill" class="metric__bar-fill"></span></div>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Source groups</span>
+          <span id="stat-sources" class="metric__value">—</span>
+          <span class="metric__sub">distinct queries</span>
+        </div>
+        <div class="metric">
+          <span class="metric__label">Run time</span>
+          <span id="stat-duration" class="metric__value">—</span>
+          <span id="stat-duration-sub" class="metric__sub">&nbsp;</span>
+        </div>
+      </div>
+
+      <!-- Intent mix -->
+      <section class="mix" aria-labelledby="mix-heading">
+        <div class="mix__head">
+          <h2 id="mix-heading" class="mix__title">Intent mix</h2>
+          <p class="mix__note">Each keyword counted once, by the query type that first surfaced it</p>
+        </div>
+        <div id="mix-bar" class="mix__bar" role="img" aria-label="Distribution of keywords by query type"></div>
+        <ul id="mix-legend" class="mix__legend"></ul>
+      </section>
+
+      <div id="partial-banner" class="alert alert--warning is-hidden">
+        <svg class="icon alert__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-info"/></svg>
+        <div class="alert__body">
+          <p id="partial-title" class="alert__title"></p>
+          <p class="alert__text">Google limited some requests. Everything shown is real data — the set is just thinner than a full run.</p>
+          <details class="disclose">
+            <summary class="disclose__summary">
+              <svg class="icon disclose__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-right"/></svg>
+              View failed queries
+            </summary>
+            <ul id="failed-queries-list" class="disclose__list"></ul>
           </details>
         </div>
       </div>
 
-      <div role="tablist" class="tabs" aria-label="Results view">
-        <button id="tab-report" type="button" role="tab" aria-selected="true" aria-controls="panel-report" class="tab-btn">AI report</button>
-        <button id="tab-raw" type="button" role="tab" aria-selected="false" aria-controls="panel-raw" class="tab-btn">Raw keywords</button>
+      <!-- Tabs -->
+      <div class="tabs" role="tablist" aria-label="Results view">
+        <button id="tab-report" type="button" role="tab" aria-selected="true" aria-controls="panel-report" class="tab">
+          <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-sparkle"/></svg>
+          Intent report
+        </button>
+        <button id="tab-raw" type="button" role="tab" aria-selected="false" aria-controls="panel-raw" class="tab">
+          <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-hash"/></svg>
+          Keywords
+          <span id="tab-raw-count" class="tab__count"></span>
+        </button>
       </div>
 
-      <div id="panel-report" role="tabpanel" aria-labelledby="tab-report" tabindex="0">
-        <button id="copy-report-btn" type="button" class="btn btn-secondary" style="align-self:flex-start;">Copy report</button>
-        <div id="report-body" class="report-body"></div>
-      </div>
-
-      <div id="panel-raw" role="tabpanel" aria-labelledby="tab-raw" tabindex="0" class="hidden">
-        <div class="raw-toolbar">
-          <input id="raw-filter" type="text" placeholder="Filter keywords&hellip;" aria-label="Filter keywords">
-          <div class="segmented" role="group" aria-label="Raw keyword view">
-            <button id="mode-grouped" type="button" aria-pressed="true">Grouped by source query</button>
-            <button id="mode-flat" type="button" aria-pressed="false">Flat unique list</button>
-          </div>
-          <button id="copy-all-btn" type="button" class="btn btn-secondary">Copy all keywords</button>
+      <!-- Report -->
+      <div id="panel-report" class="panel" role="tabpanel" aria-labelledby="tab-report" tabindex="0">
+        <div class="panel__toolbar">
+          <p class="panel__caption" id="report-model">Intent analysis across the full keyword set</p>
+          <button id="copy-report-btn" type="button" class="btn btn--ghost btn--sm">
+            <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
+            <span class="btn__label">Copy report</span>
+          </button>
         </div>
-        <p id="filter-summary" aria-live="polite"></p>
-        <div id="group-view"></div>
-        <div id="flat-view" class="hidden"></div>
+
+        <div class="report">
+          <div id="report-body" class="prose"></div>
+
+          <nav id="report-nav" class="tocnav is-hidden" aria-label="Report sections">
+            <p class="tocnav__label">On this page</p>
+            <ul id="report-toc" class="tocnav__list"></ul>
+          </nav>
+        </div>
+      </div>
+
+      <!-- Keywords -->
+      <div id="panel-raw" class="panel is-hidden" role="tabpanel" aria-labelledby="tab-raw" tabindex="0">
+        <div class="panel__toolbar panel__toolbar--wrap">
+          <div class="search">
+            <svg class="icon search__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-filter"/></svg>
+            <input id="raw-filter" class="search__input" type="text" placeholder="Filter keywords" aria-label="Filter keywords" autocomplete="off">
+          </div>
+
+          <div class="segmented" role="group" aria-label="Keyword view">
+            <button id="mode-grouped" type="button" class="segmented__btn" aria-pressed="true">
+              <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-layers"/></svg>Grouped
+            </button>
+            <button id="mode-flat" type="button" class="segmented__btn" aria-pressed="false">
+              <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-list"/></svg>Flat
+            </button>
+          </div>
+
+          <button id="copy-all-btn" type="button" class="btn btn--ghost btn--sm">
+            <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
+            <span class="btn__label">Copy all</span>
+          </button>
+        </div>
+
+        <p id="filter-summary" class="panel__summary" aria-live="polite"></p>
+        <div id="group-view" class="groups"></div>
+        <div id="flat-view" class="flat is-hidden"></div>
       </div>
     </section>
-
   </main>
+
+  <footer class="footer">
+    <span>Refract · Keyword Intent Intelligence</span>
+    <span class="footer__sep" aria-hidden="true">·</span>
+    <span>Autocomplete data is unofficial and may be throttled</span>
+  </footer>
 </div>
 
 <script

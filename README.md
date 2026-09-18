@@ -1,6 +1,8 @@
-# Keyword Suggest & Intent Analyzer
+# Refract — Keyword Intent Intelligence
 
-Internal tool. Give it a seed topic; it collects Google autocomplete
+*One topic in. The whole spectrum out.*
+
+Internal tool. Give **Refract** a seed topic; it collects Google autocomplete
 suggestions, merges them into a deduplicated keyword dataset, sends that
 dataset to Google's Gemini API for a search-intent analysis, and returns both
 the raw data and the AI report.
@@ -22,12 +24,34 @@ configuration and deployment detail:
 
 - **[backend/README.md](backend/README.md)** — every environment variable,
   the full API contract, how collection works, how to swap providers.
-- **[frontend/README.md](frontend/README.md)** — how the API URL is
-  configured, mock mode, deployment as a static site.
+- **[frontend/README.md](frontend/README.md)** — the design system (tokens,
+  type, colour, icons), every screen state, how the API URL is configured,
+  mock mode, accessibility, and deployment as a static site.
 
 Neither side depends on the other's internals, on the old single-service
 layout, or on the previously separate frontend repository. **This repo is now
 the only source of truth for the frontend.**
+
+---
+
+## Brand
+
+The product is **Refract**: a prism refracts one beam into a spectrum, and
+Refract splits one seed topic into the spectrum of search intent behind it.
+The mark is that prism reduced to two shapes — a triangle outline with a focal
+dot — so it holds at favicon size.
+
+The interface is built on a single design system documented in
+[frontend/README.md](frontend/README.md#design-system): a warm paper canvas,
+near-black primary actions, restrained radii (3/5/8/10px, no pills), hairline
+separation, Instrument Sans for display and Inter for UI, and colour reserved
+almost entirely for meaning — one hue per intent class, used identically in
+the tags, the intent-mix bar and the empty-state illustration.
+
+> Render **service names** (`keyword-analyzer-api`, `keyword-analyzer-web`)
+> are intentionally unchanged. Renaming them in `render.yaml` would orphan an
+> already-deployed service and create new ones. They are infrastructure ids,
+> not brand surface.
 
 ---
 
