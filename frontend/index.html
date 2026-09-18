@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Keyword Analyzer</title>
 <meta name="description" content="Turns a seed topic into the full spectrum of search intent: real autocomplete demand, grouped by source, analysed by AI.">
-<meta name="theme-color" content="#F6F5F3" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0D0E10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F4F5">
+<meta name="color-scheme" content="light">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2316171B'/%3E%3Cpath d='M16 7.2 27 26H5z' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='19.7' r='2.4' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -54,8 +54,6 @@
 <div id="gate-screen" class="gate">
 
   <aside class="gate__brand">
-    <div class="ascii ascii--texture" id="gate-texture" aria-hidden="true"></div>
-
     <div class="gate__brand-mark">
       <div class="lockup lockup--invert">
         <span class="lockup__mark">
@@ -214,7 +212,6 @@
           <span class="run-panel__elapsed"><span id="elapsed-value">0</span>s</span>
         </div>
         <p id="running-message" class="run-panel__stage"></p>
-        <div class="ascii ascii--collect" id="collect-field" aria-hidden="true"></div>
         <div class="progress" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100">
           <span id="run-progress" class="progress__fill"></span>
         </div>
@@ -254,17 +251,38 @@
       </div>
 
       <figure class="empty__viz">
-        <div class="ascii ascii--prism" id="prism-field" aria-hidden="true"></div>
-        <figcaption class="plate">
-          <span class="plate__step">One topic</span>
-          <span class="plate__arrow" aria-hidden="true">&rarr;</span>
-          <span class="plate__spectrum">
-            <span class="plate__class"><i class="mix__swatch mix__slice--seed"></i>Seed</span>
-            <span class="plate__class"><i class="mix__swatch mix__slice--alphabet"></i>Alphabet</span>
-            <span class="plate__class"><i class="mix__swatch mix__slice--question"></i>Question</span>
-            <span class="plate__class"><i class="mix__swatch mix__slice--commercial"></i>Commercial</span>
-          </span>
-        </figcaption>
+        <div class="spec">
+          <div class="spec__head">
+            <span class="spec__title">A typical run</span>
+            <span class="spec__note">37 queries &middot; ~150 keywords</span>
+          </div>
+          <ol class="spec__rows">
+            <li class="spec__row">
+              <span class="spec__class">Seed</span>
+              <span class="spec__bar"><i class="spec__fill spec__fill--seed" style="width:8%"></i></span>
+              <span class="spec__ex">luxury villa rentals</span>
+            </li>
+            <li class="spec__row">
+              <span class="spec__class">Alphabet</span>
+              <span class="spec__bar"><i class="spec__fill spec__fill--alphabet" style="width:64%"></i></span>
+              <span class="spec__ex">luxury villa rentals bali</span>
+            </li>
+            <li class="spec__row">
+              <span class="spec__class">Question</span>
+              <span class="spec__bar"><i class="spec__fill spec__fill--question" style="width:22%"></i></span>
+              <span class="spec__ex">how do luxury villa rentals work</span>
+            </li>
+            <li class="spec__row">
+              <span class="spec__class">Commercial</span>
+              <span class="spec__bar"><i class="spec__fill spec__fill--commercial" style="width:31%"></i></span>
+              <span class="spec__ex">best luxury villa rentals for groups</span>
+            </li>
+          </ol>
+          <div class="spec__foot">
+            <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-sparkle"/></svg>
+            <span>Then read for intent by AI</span>
+          </div>
+        </div>
       </figure>
     </section>
 
@@ -287,23 +305,10 @@
         </div>
 
         <div class="results__actions">
-          <div class="menu">
-            <button id="export-btn" type="button" class="btn btn--secondary" aria-haspopup="menu" aria-expanded="false" aria-controls="export-menu">
-              <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-download"/></svg>
-              <span class="btn__label">Export</span>
-              <svg class="icon btn__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
-            </button>
-            <div id="export-menu" class="menu__panel menu__panel--right is-hidden" role="menu" aria-labelledby="export-btn">
-              <button id="download-csv-btn" type="button" class="menu__item" role="menuitem">
-                <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-list"/></svg>
-                <span>Keywords<span class="menu__hint">.csv</span></span>
-              </button>
-              <button id="download-report-btn" type="button" class="menu__item" role="menuitem">
-                <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-sparkle"/></svg>
-                <span>Intent report<span class="menu__hint">.md</span></span>
-              </button>
-            </div>
-          </div>
+          <button id="new-run-btn" type="button" class="btn btn--ghost btn--sm">
+            <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-refresh"/></svg>
+            <span class="btn__label">New topic</span>
+          </button>
         </div>
       </header>
 
@@ -378,10 +383,22 @@
             <span class="attrib__provider" id="attrib-provider"></span>
             <span class="attrib__model" id="attrib-model"></span>
           </p>
-          <button id="copy-report-btn" type="button" class="btn btn--ghost btn--sm">
-            <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
-            <span class="btn__label">Copy report</span>
-          </button>
+          <div class="toolbar__end">
+            <button id="copy-report-btn" type="button" class="btn btn--ghost btn--sm">
+              <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
+              <span class="btn__label">Copy</span>
+            </button>
+            <div class="dl" role="group" aria-label="Download the intent report">
+              <span class="dl__label">Download</span>
+              <button id="dl-report-pdf" type="button" class="dl__btn dl__btn--primary">
+                <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-download"/></svg>
+                <span class="btn__label">PDF</span>
+              </button>
+              <button id="dl-report-md" type="button" class="dl__btn">
+                <span class="btn__label">Markdown</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="report">
@@ -411,10 +428,25 @@
             </button>
           </div>
 
-          <button id="copy-all-btn" type="button" class="btn btn--ghost btn--sm">
-            <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
-            <span class="btn__label">Copy all</span>
-          </button>
+          <div class="toolbar__end">
+            <button id="copy-all-btn" type="button" class="btn btn--ghost btn--sm">
+              <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-copy"/></svg>
+              <span class="btn__label">Copy all</span>
+            </button>
+            <div class="dl" role="group" aria-label="Download the keyword list">
+              <span class="dl__label">Download</span>
+              <button id="dl-kw-txt" type="button" class="dl__btn dl__btn--primary">
+                <svg class="icon btn__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-download"/></svg>
+                <span class="btn__label">TXT</span>
+              </button>
+              <button id="dl-kw-json" type="button" class="dl__btn">
+                <span class="btn__label">JSON</span>
+              </button>
+              <button id="dl-kw-csv" type="button" class="dl__btn">
+                <span class="btn__label">CSV</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <p id="filter-summary" class="panel__summary" aria-live="polite"></p>
@@ -441,7 +473,6 @@
   integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a"
   crossorigin="anonymous"
   onerror="window.__libLoadFailed = true"></script>
-<script src="ascii.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

@@ -36,17 +36,29 @@ the only source of truth for the frontend.**
 
 ## Brand
 
-The product is **Refract**: a prism refracts one beam into a spectrum, and
-Refract splits one seed topic into the spectrum of search intent behind it.
-The mark is that prism reduced to two shapes — a triangle outline with a focal
-dot — so it holds at favicon size.
+The product is **Keyword Analyzer**. It is an in-house tool, so the name says
+what it does rather than trying to be memorable. The mark keeps the prism idea
+— one beam in, a spectrum out — reduced to two shapes, a triangle outline with
+a focal dot, so it holds at favicon size.
 
 The interface is built on a single design system documented in
-[frontend/README.md](frontend/README.md#design-system): a warm paper canvas,
-near-black primary actions, restrained radii (3/5/8/10px, no pills), hairline
-separation, Instrument Sans for display and Inter for UI, and colour reserved
-almost entirely for meaning — one hue per intent class, used identically in
-the tags, the intent-mix bar and the empty-state illustration.
+[frontend/README.md](frontend/README.md#design-system):
+
+- **Light only, and monochrome.** Black, white and grey — a neutral canvas,
+  white surfaces, four ink steps, near-black primary actions. There is no
+  dark palette.
+- **Exactly one hue.** A restrained orange appears on the run progress bar
+  and the pulsing *Running* dot, and nowhere else, so colour means *this is
+  moving* and nothing else.
+- **Intent classes read by value, not colour.** Seed, alphabet, question and
+  commercial are four steps down the ink ladder, used identically in the
+  tags, the intent-mix bar and the empty-state specimen — which also makes
+  them survive greyscale printing and colour blindness.
+- **Geist and Geist Mono** for display, UI and data.
+- **Restrained radii** (3/5/8/10px, no pills) and hairline separation;
+  shadow only where something genuinely floats.
+
+All text pairs meet WCAG AA, verified by computing ratios from the tokens.
 
 > Render **service names** (`keyword-analyzer-api`, `keyword-analyzer-web`)
 > are intentionally unchanged. Renaming them in `render.yaml` would orphan an

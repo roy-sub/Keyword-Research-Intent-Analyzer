@@ -78,6 +78,7 @@ backend/
     cache.py          TTL + LRU cache
     models.py         request/response models (the API contract)
     analysis.py       prompt, the three providers, and the fallback chain
+    pdf.py            Markdown → typeset PDF (ReportLab Platypus)
     suggest/
       base.py         SuggestProvider protocol, query set, dedupe, merge
       google.py       GoogleSuggestProvider
@@ -303,6 +304,54 @@ Errors:
 | 504 | `{"detail": "The run timed out."}` |
 
 No key, traceback, or upstream response body ever appears in `detail`.
+
+### `POST /api/export/report.pdf`
+
+Typesets a report the client already holds into a PDF. Returns
+`application/pdf` with a `Content-Disposition` attachment filename.
+
+Request:
+
+```json
+{
+  "topic": "luxury villa rentals",
+  "analysis_markdown": "## 1. Search Intent Classification\n...",
+  "generated_at": "2026-09-18T09:14:03Z",
+  "provider_label": "Claude",
+  "model": "claude-sonnet-5",
+  "total_keywords": 150,
+  "queries_succeeded": 35,
+  "queries_attempted": 37
+}
+```
+
+Only `topic` and `analysis_markdown` are required; the rest fill the facts
+strip under the title and are omitted from the document if absent.
+
+**Why the client posts the report back instead of naming a run.** Re-running
+the analysis to export it would cost a quota slot and could return different
+prose than the one on screen, and caching rendered PDFs server-side would
+mean holding user content for no reason. So this route **costs no quota,
+makes no upstream call, and stores nothing** — it is a pure function from the
+posted body to bytes.
+
+**The Markdown is untrusted.** It arrives over the wire, so every string is
+escaped with `xml.sax.saxutils.escape` before any inline formatting is
+applied, and the renderer is tested against malformed tables, unclosed
+emphasis, deep headings, unbreakable tokens and embedded ReportLab markup.
+None of it may raise. The filename is slugified to quote-free ASCII because
+it is interpolated into a response header.
+
+Rendering is ReportLab Platypus on a worker thread (`asyncio.to_thread`), so
+a long report cannot block the event loop while a run is in flight.
+
+Errors:
+
+| Status | Body |
+|---|---|
+| 401 | `{"detail": "Invalid or missing access key."}` |
+| 422 | Pydantic validation — empty topic or empty report |
+| 500 | `{"detail": "The PDF could not be built."}` |
 
 ### `POST /api/login`, `POST /api/logout`
 

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   REFRACT — application logic
+   KEYWORD ANALYZER — application logic
 
    The backend is a separate service on its own origin. Its base URL comes
    from window.APP_CONFIG.API_BASE_URL in config.js, which build.sh rewrites
@@ -19,7 +19,7 @@
 
   /* Holds the opaque session token returned by POST /api/login. The
      password itself is never stored. */
-  const ACCESS_KEY_STORAGE = "refract.session";
+  const ACCESS_KEY_STORAGE = "keyword-analyzer.session";
   const CLIENT_TIMEOUT_MS = 180000;
   const MOCK_DELAY_MS = 6000;
 
@@ -56,7 +56,6 @@
     runTimerId: null,
     timeoutId: null,
     elapsedSeconds: 0,
-    runProgress: 0,
     openMenu: null
   };
 
@@ -159,18 +158,17 @@
     errorActionBtn: $("error-action-btn"),
 
     emptyState: $("empty-state"),
-    prismField: $("prism-field"),
-    gateTexture: $("gate-texture"),
-    collectField: $("collect-field"),
 
     results: $("results"),
     cachedBadge: $("cached-badge"),
     resultsTopic: $("results-topic"),
     generatedAt: $("generated-at"),
-    exportBtn: $("export-btn"),
-    exportMenu: $("export-menu"),
-    downloadReportBtn: $("download-report-btn"),
-    downloadCsvBtn: $("download-csv-btn"),
+    newRunBtn: $("new-run-btn"),
+    dlReportPdf: $("dl-report-pdf"),
+    dlReportMd: $("dl-report-md"),
+    dlKwTxt: $("dl-kw-txt"),
+    dlKwJson: $("dl-kw-json"),
+    dlKwCsv: $("dl-kw-csv"),
 
     statTotal: $("stat-total"),
     statTotalSub: $("stat-total-sub"),
@@ -315,18 +313,52 @@
     if (use) use.setAttribute("href", "#i-" + name);
   }
 
-  /* Transient success/failure feedback on an action button. */
+  /* Transient success/failure feedback on an action button. The original
+     icon is captured rather than assumed, so copy, download and any future
+     action button all restore to the right glyph. */
   function flashButton(button, ok, doneLabel, failLabel) {
     const label = button.querySelector(".btn__label");
+    const use = button.querySelector(".btn__icon use");
     const original = label ? label.textContent : "";
+    const originalIcon = use ? use.getAttribute("href") : null;
+
+    clearTimeout(button.__flashTimer);
     if (label) label.textContent = ok ? doneLabel : failLabel;
-    setButtonIcon(button, ok ? "check" : "close");
+    if (use) use.setAttribute("href", ok ? "#i-check" : "#i-close");
     button.classList.toggle("is-done", ok);
-    setTimeout(() => {
+
+    button.__flashTimer = setTimeout(() => {
       if (label) label.textContent = original;
-      setButtonIcon(button, "copy");
+      if (use && originalIcon) use.setAttribute("href", originalIcon);
       button.classList.remove("is-done");
     }, 1600);
+  }
+
+  /* Disables a button and shows a working label; the returned function puts
+     it back exactly as it was, whichever way the work ended. */
+  function setButtonBusy(button, busyLabel) {
+    const label = button.querySelector(".btn__label");
+    const original = label ? label.textContent : "";
+    const wasDisabled = button.disabled;
+    if (label) label.textContent = busyLabel;
+    button.disabled = true;
+    button.classList.add("is-busy");
+    return function restore() {
+      if (label) label.textContent = original;
+      button.disabled = wasDisabled;
+      button.classList.remove("is-busy");
+    };
+  }
+
+  function downloadBlob(filename, blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   /* ------------------------------------------------------------------
@@ -374,6 +406,28 @@
     });
     if (!res.ok) throw new ApiError(res.status, await safeJson(res));
     return res.json();
+  }
+
+  /* The report is posted back rather than regenerated: re-running the
+     analysis to export it would cost a quota slot and could return different
+     prose than the one on screen. */
+  async function apiReportPdf(data) {
+    const res = await fetch(apiUrl("/api/export/report.pdf"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Access-Key": state.accessKey },
+      body: JSON.stringify({
+        topic: data.topic,
+        analysis_markdown: data.analysis_markdown,
+        generated_at: data.generated_at,
+        provider_label: PROVIDER_NAMES[data.analysis_provider] || data.analysis_provider || "",
+        model: data.analysis_model,
+        total_keywords: data.total_keywords,
+        queries_succeeded: data.queries_succeeded,
+        queries_attempted: data.queries_attempted
+      })
+    });
+    if (!res.ok) throw new ApiError(res.status, await safeJson(res));
+    return res.blob();
   }
 
   async function apiLogout(key) {
@@ -582,13 +636,11 @@
       const pct = Math.min(88, Math.round((elapsed / estimate) * 88));
       el.runProgress.style.width = pct + "%";
       el.runProgress.parentElement.setAttribute("aria-valuenow", String(pct));
-      state.runProgress = pct / 100;
     } else {
       el.runningMessage.textContent = "Reading search intent";
       el.runProgress.classList.add("progress__fill--indeterminate");
       el.runProgress.parentElement.removeAttribute("aria-valuenow");
       /* The collection phase is done; let the field run out to full. */
-      state.runProgress = 1;
     }
   }
 
@@ -1236,6 +1288,61 @@
      DOWNLOADS
      ------------------------------------------------------------------ */
 
+  /* TXT is the default because it is the format the data is usually going
+     straight into — a prompt, a spreadsheet paste, a brief. It is the plain
+     keyword list and nothing else; the header lines are comments so a naive
+     paste still works if the reader strips them. */
+  function buildTxt(data) {
+    const header = [
+      "# " + data.topic,
+      "# " + data.total_keywords + " keywords · " +
+        data.queries_succeeded + " of " + data.queries_attempted + " queries · " +
+        formatTimestamp(data.generated_at),
+      ""
+    ];
+    return header.concat(data.keywords.map((k) => k.keyword)).join("\n") + "\n";
+  }
+
+  /* The .md download is the report plus a short provenance header, so the
+     file still says what it is once it is out of the app and sitting in
+     someone's notes folder. */
+  function buildReportMarkdown(data) {
+    const provider = PROVIDER_NAMES[data.analysis_provider] || data.analysis_provider || "";
+    const by = [provider, data.analysis_model].filter(Boolean).join(" · ");
+    const lines = [
+      "# " + data.topic,
+      "",
+      "> Search intent report · Keyword Analyzer",
+      ">",
+      "> - Generated: " + formatTimestamp(data.generated_at),
+      "> - Unique keywords: " + data.total_keywords,
+      "> - Queries answered: " + data.queries_succeeded + " of " + data.queries_attempted
+    ];
+    if (by) lines.push("> - Analysed by: " + by);
+    lines.push("", "---", "", data.analysis_markdown.trim(), "");
+    return lines.join("\n");
+  }
+
+  /* JSON keeps the source attribution, which is the part a script would
+     want and the flat formats cannot carry without repeating every row. */
+  function buildJson(data) {
+    return JSON.stringify({
+      topic: data.topic,
+      generated_at: data.generated_at,
+      total_keywords: data.total_keywords,
+      queries_attempted: data.queries_attempted,
+      queries_succeeded: data.queries_succeeded,
+      failed_queries: data.failed_queries,
+      keywords: data.keywords.map((k) => ({
+        keyword: k.keyword,
+        sources: k.sources,
+        types: k.types
+      }))
+    }, null, 2) + "\n";
+  }
+
+  /* The BOM is what makes Excel open UTF-8 correctly; without it any
+     non-ASCII keyword arrives mojibaked. */
   function buildCsv(data) {
     const rows = [["keyword", "sources", "types"]];
     data.keywords.forEach((k) => rows.push([k.keyword, k.sources.join(", "), k.types.join(", ")]));
@@ -1296,7 +1403,6 @@
   el.gatePassword.addEventListener("input", clearGateError);
 
   el.accountBtn.addEventListener("click", () => toggleMenu(el.accountBtn, el.accountMenu));
-  el.exportBtn.addEventListener("click", () => toggleMenu(el.exportBtn, el.exportMenu));
 
   el.logoutBtn.addEventListener("click", async () => {
     const key = state.accessKey;
@@ -1385,84 +1491,70 @@
     flashButton(el.copyReportBtn, ok, "Copied", "Failed");
   });
 
-  el.downloadCsvBtn.addEventListener("click", () => {
-    if (!state.lastResult) return;
-    closeMenu();
-    const data = state.lastResult;
-    downloadTextFile(
-      filenameFor("keywords", data.topic, data.generated_at, "csv"),
-      "text/csv;charset=utf-8",
-      buildCsv(data)
-    );
+  el.newRunBtn.addEventListener("click", () => {
+    el.topicInput.focus();
+    el.topicInput.select();
   });
 
-  el.downloadReportBtn.addEventListener("click", () => {
+  /* ---- Keyword downloads: TXT is the primary, JSON and CSV sit beside it ---- */
+
+  function downloadKeywords(button, ext, mime, build) {
     if (!state.lastResult) return;
-    closeMenu();
     const data = state.lastResult;
     downloadTextFile(
-      filenameFor("report", data.topic, data.generated_at, "md"),
+      filenameFor("keywords", data.topic, data.generated_at, ext),
+      mime,
+      build(data)
+    );
+    flashButton(button, true, "Saved", "Failed");
+  }
+
+  el.dlKwTxt.addEventListener("click", () =>
+    downloadKeywords(el.dlKwTxt, "txt", "text/plain;charset=utf-8", buildTxt));
+  el.dlKwJson.addEventListener("click", () =>
+    downloadKeywords(el.dlKwJson, "json", "application/json;charset=utf-8", buildJson));
+  el.dlKwCsv.addEventListener("click", () =>
+    downloadKeywords(el.dlKwCsv, "csv", "text/csv;charset=utf-8", buildCsv));
+
+  /* ---- Report downloads ---- */
+
+  el.dlReportMd.addEventListener("click", () => {
+    if (!state.lastResult) return;
+    const data = state.lastResult;
+    downloadTextFile(
+      filenameFor("intent-report", data.topic, data.generated_at, "md"),
       "text/markdown;charset=utf-8",
-      data.analysis_markdown
+      buildReportMarkdown(data)
     );
+    flashButton(el.dlReportMd, true, "Saved", "Failed");
   });
 
-  /* ------------------------------------------------------------------
-     ASCII FIELDS
-
-     Decorative only, and only on expressive surfaces. Each is aria-hidden;
-     nothing here carries meaning that the surrounding text does not already
-     state, so a browser that cannot run them loses nothing.
-     ------------------------------------------------------------------ */
-
-  function mountAsciiFields() {
-    if (!global_Ascii()) return;
-    const Ascii = global_Ascii();
-
-    if (el.prismField) {
-      Ascii.createField(el.prismField, {
-        layers: ["structure", "seed", "alphabet", "question", "commercial"],
-        sample: Ascii.prismSample,
-        /* Fewer, larger cells read as drawing; more, smaller cells read as
-           noise. 76 is the point where the prism still resolves. */
-        rows: (cols) => Math.max(20, Math.round(cols * 0.47)),
-        maxCols: 76
-      });
+  /* The PDF is typeset server-side: real pagination, running heads and table
+     layout are not things a browser print dump gives you, and doing it here
+     would mean shipping a PDF library to every visitor. */
+  el.dlReportPdf.addEventListener("click", async () => {
+    if (!state.lastResult || el.dlReportPdf.disabled) return;
+    const data = state.lastResult;
+    const restore = setButtonBusy(el.dlReportPdf, "Building…");
+    try {
+      const blob = await apiReportPdf(data);
+      downloadBlob(filenameFor("intent-report", data.topic, data.generated_at, "pdf"), blob);
+      restore();
+      flashButton(el.dlReportPdf, true, "Saved", "Failed");
+    } catch (err) {
+      restore();
+      flashButton(el.dlReportPdf, false, "Saved", "Failed");
+      /* The report is still on screen and still downloadable as Markdown, so
+         this is a note rather than a blocking error. */
+      showNote("The PDF could not be built. The Markdown download still works.");
     }
-
-    if (el.gateTexture) {
-      Ascii.createField(el.gateTexture, {
-        layers: ["grain"],
-        sample: Ascii.textureSample,
-        rows: (cols, box) => Math.max(20, Math.round(box.height / 14)),
-        maxCols: 300,
-        /* A slow drift needs far fewer frames than the prism, which keeps a
-           grid this large cheap. */
-        fps: 5
-      });
-    }
-
-    if (el.collectField) {
-      Ascii.createField(el.collectField, {
-        layers: ["wave"],
-        sample: Ascii.makeCollectSample(() => state.runProgress),
-        rows: () => 5,
-        maxCols: 340,
-        fps: 12
-      });
-    }
-  }
-
-  function global_Ascii() {
-    return typeof window !== "undefined" && window.Ascii ? window.Ascii : null;
-  }
+  });
 
   /* ------------------------------------------------------------------
      INIT
      ------------------------------------------------------------------ */
 
   async function init() {
-    mountAsciiFields();
     if (window.__libLoadFailed || !librariesAvailable()) {
       el.libError.classList.remove("is-hidden");
     }

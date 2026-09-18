@@ -1,5 +1,5 @@
 /* ==========================================================================
-   REFRACT — design system
+   KEYWORD ANALYZER — design system
    --------------------------------------------------------------------------
    One system, three layers:
      1. Tokens      colour, type, space, radius, motion — defined once
@@ -7,10 +7,15 @@
      3. Regions     gate, topbar, query bar, metrics, results
 
    Conventions
+     · Light only. There is no dark palette: the tool is a reading surface
+       and one well-tuned set of neutrals beats two mediocre ones.
+     · The palette is black, white and grey. Hue appears in exactly one
+       place — the live progress indicator — so that motion reads as the
+       only thing on screen that is happening right now.
+     · The four intent classes are separated by ink weight and fill, not by
+       colour, which also makes them survive greyscale printing.
      · Radii are restrained: 3 / 5 / 8 / 10px. No pills.
      · Separation is by hairline first, shadow only where something floats.
-     · Colour is scarce. Ink carries emphasis; the accent marks interaction
-       and data. Hue is reserved for the four intent classes.
    ========================================================================== */
 
 /* ==========================================================================
@@ -18,10 +23,14 @@
    ========================================================================== */
 
 :root {
-  /* -- Type ------------------------------------------------------------- */
-  --font-display: "Instrument Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-  --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* -- Type -------------------------------------------------------------
+     Geist is the display and UI face: a modern grotesk with a tall x-height
+     and flat terminals that stays legible at 11px in table headers and
+     still has presence at 68px. Geist Mono carries keywords and any string
+     the user might copy, where character-level distinction matters. */
+  --font-display: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-ui: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --fs-display-xl: clamp(2.5rem, 1.4rem + 4.4vw, 4.25rem);
   --fs-display-l:  clamp(1.875rem, 1.25rem + 2.4vw, 2.75rem);
@@ -57,93 +66,78 @@
   --t-base: 180ms;
   --t-slow: 320ms;
 
-  /* -- Colour: light ----------------------------------------------------- */
-  --c-canvas:       #F5F4F1;
+  /* -- Surfaces ----------------------------------------------------------
+     A cool, near-neutral grey ladder. The canvas is a step below white so
+     that panels lift off it without needing a shadow. */
+  --c-canvas:       #F4F4F5;
   --c-surface:      #FFFFFF;
-  --c-surface-2:    #FAF9F7;
-  --c-sunken:       #EFEDE9;
-  --c-inset:        #F6F5F2;
+  --c-surface-2:    #FAFAFB;
+  --c-sunken:       #EDEDEF;
+  --c-inset:        #F6F6F7;
 
-  --c-ink-1: #15161A;
-  --c-ink-2: #3C3E45;
-  --c-ink-3: #666971;
-  --c-ink-4: #787B84;
+  /* -- Ink ---------------------------------------------------------------
+     Four steps only. 1 is for headings and data, 2 for body, 3 for labels,
+     4 for the quietest metadata. */
+  --c-ink-1: #101113;
+  --c-ink-2: #34363B;
+  --c-ink-3: #5C5F66;
+  --c-ink-4: #6B6E75;
+  /* All four clear 4.5:1 on both the canvas and white, so nothing in the
+     interface is text that only mostly passes. */
 
-  --c-line:        rgba(21, 22, 26, 0.09);
-  --c-line-strong: rgba(21, 22, 26, 0.16);
-  --c-line-solid:  #E4E1DC;
+  --c-line:        rgba(16, 17, 19, 0.10);
+  --c-line-strong: rgba(16, 17, 19, 0.18);
+  --c-line-solid:  #E3E3E6;
 
-  --c-accent:      #3F44D4;
-  --c-accent-hi:   #363BC2;
-  --c-accent-tint: #ECECFC;
-  --c-accent-line: rgba(63, 68, 212, 0.28);
+  /* -- Interaction -------------------------------------------------------
+     The accent is ink. Primary actions are near-black on white, which in a
+     monochrome system is the strongest signal available and keeps hue free
+     for the one place that earns it. */
+  --c-accent:      #101113;
+  --c-accent-hi:   #000000;
+  --c-accent-tint: #E8E8EA;
+  --c-accent-line: rgba(16, 17, 19, 0.30);
 
   --c-on-solid: #FFFFFF;
-  --c-solid:    #17181C;
+  --c-solid:    #101113;
   --c-solid-hi: #000000;
 
-  --c-ok:       #176A4E;  --c-ok-tint:   #E4F1EB;
-  --c-warn:     #8A5A16;  --c-warn-tint: #F8EEDC;
-  --c-danger:   #A22C1C;  --c-danger-tint: #FBEBE7;
-  --c-danger-line: rgba(162, 44, 28, 0.24);
+  /* -- Live ---------------------------------------------------------------
+     The single permitted hue, used only while work is in flight: the run
+     progress bar and the collecting indicator. Nothing static is ever
+     orange, so the colour means "this is moving" and nothing else. */
+  --c-live:      #E8590C;
+  --c-live-soft: rgba(232, 89, 12, 0.16);
 
-  /* Intent classes */
-  --c-seed:       #3A3DB0; --c-seed-bg:       #E9E9FA;
-  --c-alphabet:   #6E717A; --c-alphabet-bg:   #EAE8E4;
-  --c-alphabet-ink: #55585F;
-  --c-question:   #15665A; --c-question-bg:   #E0F0EC;
-  --c-commercial: #8A5814; --c-commercial-bg: #F7EBD9;
+  /* -- Status ------------------------------------------------------------
+     Status is carried by ink weight, an icon and a fill — not by hue. */
+  --c-ok:          #101113;  --c-ok-tint:     #F0F0F1;
+  --c-warn:        #34363B;  --c-warn-tint:   #F4F4F5;
+  --c-danger:      #101113;  --c-danger-tint: #F2F2F3;
+  --c-danger-line: rgba(16, 17, 19, 0.26);
 
-  --shadow-sm: 0 1px 2px rgba(21, 22, 26, 0.05);
-  --shadow-md: 0 4px 12px -4px rgba(21, 22, 26, 0.10), 0 1px 2px rgba(21, 22, 26, 0.05);
-  --shadow-pop: 0 12px 32px -12px rgba(21, 22, 26, 0.26), 0 2px 6px -2px rgba(21, 22, 26, 0.10);
+  /* -- Intent classes ----------------------------------------------------
+     Four steps down the ink ladder, each with its own fill. Seed is the
+     darkest because it is the query the user actually typed.
 
-  --focus: 0 0 0 2px var(--c-canvas), 0 0 0 4px var(--c-accent-line);
+     Fill and ink are separate tokens on purpose: a stacked bar needs the
+     four greys spread as far apart as possible to stay readable at 8px,
+     while the same grey as 11px tag text on a tinted chip would fall under
+     4.5:1. The -ink steps are the ones tuned against -bg. */
+  --c-seed:       #101113; --c-seed-bg:       #E4E4E7; --c-seed-ink:       #101113;
+  --c-alphabet:   #3F4247; --c-alphabet-bg:   #EAEAEC; --c-alphabet-ink:   #2F3237;
+  --c-question:   #71747B; --c-question-bg:   #F0F0F2; --c-question-ink:   #4A4D53;
+  --c-commercial: #A6A9AF; --c-commercial-bg: #F5F5F6; --c-commercial-ink: #5C5F66;
+
+  --shadow-sm: 0 1px 2px rgba(16, 17, 19, 0.05);
+  --shadow-md: 0 4px 12px -4px rgba(16, 17, 19, 0.10), 0 1px 2px rgba(16, 17, 19, 0.05);
+  --shadow-pop: 0 12px 32px -12px rgba(16, 17, 19, 0.24), 0 2px 6px -2px rgba(16, 17, 19, 0.10);
+
+  --focus: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-accent-line);
   --topbar-h: 58px;
   --maxw: 1200px;
-}
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --c-canvas:    #0C0D0F;
-    --c-surface:   #141518;
-    --c-surface-2: #17181C;
-    --c-sunken:    #0A0B0D;
-    --c-inset:     #1A1B1F;
-
-    --c-ink-1: #F3F2EF;
-    --c-ink-2: #C6C7CB;
-    --c-ink-3: #90939A;
-    --c-ink-4: #6B6E76;
-
-    --c-line:        rgba(255, 255, 255, 0.09);
-    --c-line-strong: rgba(255, 255, 255, 0.18);
-    --c-line-solid:  #26282D;
-
-    --c-accent:      #868BF5;
-    --c-accent-hi:   #9DA1F8;
-    --c-accent-tint: rgba(134, 139, 245, 0.14);
-    --c-accent-line: rgba(134, 139, 245, 0.36);
-
-    --c-on-solid: #101114;
-    --c-solid:    #F3F2EF;
-    --c-solid-hi: #FFFFFF;
-
-    --c-ok:     #5CC199; --c-ok-tint:   rgba(92, 193, 153, 0.13);
-    --c-warn:   #DDA95F; --c-warn-tint: rgba(221, 169, 95, 0.13);
-    --c-danger: #E88571; --c-danger-tint: rgba(232, 133, 113, 0.13);
-    --c-danger-line: rgba(232, 133, 113, 0.32);
-
-    --c-seed:       #A2A5F7; --c-seed-bg:       rgba(120, 124, 240, 0.16);
-    --c-alphabet:   #A9ACB3; --c-alphabet-bg:   rgba(255, 255, 255, 0.07);
-    --c-alphabet-ink: #A9ACB3;
-    --c-question:   #63C9B4; --c-question-bg:   rgba(45, 180, 155, 0.14);
-    --c-commercial: #DFB271; --c-commercial-bg: rgba(220, 160, 60, 0.14);
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 14px -4px rgba(0, 0, 0, 0.5);
-    --shadow-pop: 0 16px 40px -14px rgba(0, 0, 0, 0.72), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
-  }
+  color-scheme: light;
 }
 
 /* ==========================================================================
@@ -216,10 +210,15 @@ a:hover { text-decoration: underline; }
   width: 5px; height: 5px; border-radius: 50%;
   background: var(--c-accent); flex: none;
 }
-.eyebrow__dot--live { background: var(--c-ok); animation: pulse 1.8s var(--e-std) infinite; }
+/* The running dot is the other place hue is allowed: it and the progress bar
+   are the only live things on screen. The halo keeps it findable at 5px. */
+.eyebrow__dot--live {
+  background: var(--c-live);
+  animation: pulse 1.8s var(--e-std) infinite;
+}
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: .45; transform: scale(.82); }
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 var(--c-live-soft); }
+  50%      { opacity: .55; transform: scale(.86); box-shadow: 0 0 0 4px transparent; }
 }
 
 /* -- Buttons --------------------------------------------------------------*/
@@ -262,7 +261,58 @@ a:hover { text-decoration: underline; }
 .btn--danger { background: transparent; color: var(--c-danger); border-color: var(--c-danger-line); }
 .btn--danger:hover:not(:disabled) { background: var(--c-danger-tint); }
 
-.btn.is-done { color: var(--c-ok); }
+.btn.is-done { color: var(--c-ink-1); }
+.btn.is-busy { cursor: progress; }
+
+/* -- Download group -------------------------------------------------------
+      Downloads sit in the tab that owns the data rather than behind one
+      "Export" menu, because the formats differ per tab and a hidden menu
+      made the most-used action in the tool invisible. The default format is
+      filled; the alternates are hairline, so the recommended path is
+      obvious without the others being hard to find. --------------------- */
+.dl { display: inline-flex; align-items: center; gap: var(--s-2); }
+.dl__label {
+  margin-right: var(--s-1);
+  font-size: var(--fs-micro); font-weight: 560;
+  letter-spacing: var(--tr-micro); text-transform: uppercase;
+  color: var(--c-ink-4);
+}
+.dl__btn {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  height: 30px; padding: 0 var(--s-5);
+  border: 1px solid var(--c-line-strong); border-radius: var(--r-sm);
+  background: var(--c-surface); color: var(--c-ink-2);
+  font: inherit; font-size: var(--fs-xs); font-weight: 560;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--e-std),
+              border-color var(--t-fast) var(--e-std),
+              color var(--t-fast) var(--e-std);
+}
+.dl__btn .icon { width: 14px; height: 14px; }
+.dl__btn:hover:not(:disabled) { background: var(--c-inset); border-color: var(--c-ink-4); color: var(--c-ink-1); }
+.dl__btn:active:not(:disabled) { transform: translateY(0.5px); }
+.dl__btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.dl__btn:disabled { cursor: progress; opacity: .55; }
+.dl__btn--primary {
+  background: var(--c-solid); border-color: var(--c-solid); color: var(--c-on-solid);
+}
+.dl__btn--primary:hover:not(:disabled) { background: var(--c-solid-hi); border-color: var(--c-solid-hi); color: var(--c-on-solid); }
+.dl__btn.is-done { background: var(--c-surface); border-color: var(--c-ink-1); color: var(--c-ink-1); }
+
+/* Keeps copy-and-download together at the end of a toolbar, and lets the
+   pair wrap as one unit on narrow screens. */
+.toolbar__end { display: flex; align-items: center; gap: var(--s-5); flex-wrap: wrap; }
+@media (max-width: 40rem) {
+  .dl__label { display: none; }
+  .toolbar__end { width: 100%; justify-content: space-between; }
+}
+/* On the narrowest phones the format buttons wrap rather than push the page
+   sideways; three formats are worth two rows, a horizontal scrollbar is not. */
+@media (max-width: 26rem) {
+  .dl { flex-wrap: wrap; }
+  .dl__btn { padding: 0 var(--s-4); }
+}
 
 /* -- Chip button ----------------------------------------------------------*/
 .chip-btn {
@@ -294,10 +344,10 @@ a:hover { text-decoration: underline; }
   font-size: var(--fs-micro); font-weight: 560;
   letter-spacing: 0.03em; text-transform: uppercase;
 }
-.tag--seed       { background: var(--c-seed-bg);       color: var(--c-seed); }
+.tag--seed       { background: var(--c-seed-bg);       color: var(--c-seed-ink); }
 .tag--alphabet   { background: var(--c-alphabet-bg);   color: var(--c-alphabet-ink); }
-.tag--question   { background: var(--c-question-bg);   color: var(--c-question); }
-.tag--commercial { background: var(--c-commercial-bg); color: var(--c-commercial); }
+.tag--question   { background: var(--c-question-bg);   color: var(--c-question-ink); }
+.tag--commercial { background: var(--c-commercial-bg); color: var(--c-commercial-ink); }
 
 /* -- Form field -----------------------------------------------------------*/
 .field { margin-bottom: var(--s-5); }
@@ -441,9 +491,11 @@ a:hover { text-decoration: underline; }
   background: var(--c-sunken); border-radius: 2px; overflow: hidden;
 }
 .progress--thin { height: 3px; flex: 1; }
+/* The one place hue is allowed. Progress is the only thing on screen that
+   is actively happening, so it is the only thing that gets colour. */
 .progress__fill {
   display: block; height: 100%; width: 0%;
-  background: var(--c-accent); border-radius: 2px;
+  background: var(--c-live); border-radius: 2px;
   transition: width var(--t-slow) var(--e-out);
 }
 .progress__fill--indeterminate {
@@ -740,9 +792,9 @@ a:hover { text-decoration: underline; }
 .empty {
   flex: 1;
   display: grid; grid-template-columns: 1fr; gap: var(--s-10);
-  align-items: center; align-content: center;
-  margin-top: var(--s-10);
-  padding: var(--s-10) 0;
+  align-items: start; align-content: start;
+  margin-top: var(--s-9);
+  padding: var(--s-11) 0 var(--s-12);
   border-top: 1px solid var(--c-line);
 }
 .empty__display {
@@ -763,92 +815,81 @@ a:hover { text-decoration: underline; }
 }
 .empty__viz { display: none; margin: 0; }
 
-/* -- Editorial caption plate ---------------------------------------------
-      Borrowed from print: a tracked-out metadata strip under the plate. It
-      earns its place by doubling as the intent-class legend. ------------- */
-.plate {
-  display: flex; align-items: center; gap: var(--s-3);
-  flex-wrap: wrap;
-  margin-top: var(--s-6); padding-top: var(--s-5);
-  border-top: 1px solid var(--c-line);
+/* -- Specimen -------------------------------------------------------------
+      The empty state has to answer one question — what will I get? — so it
+      shows the answer rather than decorating around it: a miniature of the
+      real intent breakdown, using the same ink steps and the same mono face
+      the results use. It doubles as the class legend. ------------------- */
+.spec {
+  background: var(--c-surface);
+  border: 1px solid var(--c-line-solid);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.spec__head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s-5);
+  padding: var(--s-6) var(--s-7);
+  border-bottom: 1px solid var(--c-line);
+}
+.spec__title {
   font-size: var(--fs-micro); font-weight: 560;
   letter-spacing: var(--tr-micro); text-transform: uppercase;
   color: var(--c-ink-3);
 }
-.plate__arrow { color: var(--c-ink-4); }
-.plate__spectrum { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-5); margin-left: var(--s-2); }
-.plate__class { display: inline-flex; align-items: center; gap: var(--s-2); }
-.plate__class i { width: 6px; height: 6px; border-radius: 1px; flex: none; }
-
-@media (min-width: 60rem) {
-  /* The plate is the hero here, so it takes the larger share of the grid. */
-  .empty { grid-template-columns: 1fr 1.22fr; gap: var(--s-11); align-items: center; }
-  .empty__viz { display: block; }
-}
-
-/* ==========================================================================
-   8b. ASCII FIELDS
-
-   A character grid used as a design material. Applied only to expressive
-   surfaces — the empty state, the sign-in panel, the running state. It is
-   deliberately kept away from every data surface (metrics, keyword rows, the
-   intent-mix bar, the report), where precision is what is being read and a
-   character ramp would trade legibility for style.
-   ========================================================================== */
-
-.ascii { position: relative; width: 100%; overflow: hidden; }
-.ascii__layer {
-  margin: 0;
+.spec__note {
   font-family: var(--font-mono);
-  font-size: 11px; line-height: 1.02; letter-spacing: 0;
-  white-space: pre;
-  user-select: none; pointer-events: none;
-  -webkit-font-smoothing: antialiased;
+  font-size: var(--fs-micro); color: var(--c-ink-4);
 }
-/* Layers stack over one grid; the first holds the box, the rest overlay it. */
-.ascii__layer + .ascii__layer { position: absolute; inset: 0; }
-
-/* The measuring probe must shrink to its own text, so it opts out of the
-   stacking rule above. Without this every grid measures as wide as the probe
-   string and the art collapses to a fixed column count. */
-.ascii__probe {
-  position: absolute !important;
-  inset: auto !important;
-  left: 0; top: 0;
-  width: auto !important;
-  visibility: hidden;
-  pointer-events: none;
+.spec__rows { list-style: none; margin: 0; padding: var(--s-3) 0; }
+.spec__row {
+  display: grid; grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center; gap: var(--s-5);
+  padding: var(--s-4) var(--s-7);
 }
-
-/* ---- Prism: structure in ink, spectrum in the four class hues ---- */
-.ascii--prism { --ascii-size: clamp(9px, 1vw, 13px); }
-.ascii--prism .ascii__layer { font-size: var(--ascii-size); }
-.ascii--prism .ascii__layer--structure  { color: var(--c-ink-2); }
-.ascii--prism .ascii__layer--seed       { color: var(--c-seed); }
-.ascii--prism .ascii__layer--alphabet   { color: var(--c-alphabet); }
-.ascii--prism .ascii__layer--question   { color: var(--c-question); }
-.ascii--prism .ascii__layer--commercial { color: var(--c-commercial); }
-
-/* ---- Sign-in texture: paper grain, not art ---- */
-.ascii--texture {
-  position: absolute; inset: 0; z-index: 0;
+.spec__class {
+  font-size: var(--fs-micro); font-weight: 560;
+  letter-spacing: var(--tr-micro); text-transform: uppercase;
+  color: var(--c-ink-2);
+}
+.spec__bar {
+  height: 6px; border-radius: 2px;
+  background: var(--c-sunken);
   overflow: hidden;
 }
-.ascii--texture .ascii__layer {
-  font-size: 12px; line-height: 1.18;
-  color: rgba(255, 255, 255, 0.5);
-  opacity: 0.13;
+.spec__fill {
+  display: block; height: 100%;
+  border-radius: 2px;
+  animation: spec-grow 900ms var(--e-out) both;
 }
+.spec__fill--seed       { background: var(--c-seed); }
+.spec__fill--alphabet   { background: var(--c-alphabet); }
+.spec__fill--question   { background: var(--c-question); }
+.spec__fill--commercial { background: var(--c-commercial); }
+@keyframes spec-grow { from { transform: scaleX(0); transform-origin: left; } to { transform: none; } }
 
-/* ---- Collection field: a wavefront that advances with the run ---- */
-.ascii--collect {
-  height: 52px; overflow: hidden;
-  margin: var(--s-5) 0 var(--s-4);
-  mask-image: linear-gradient(90deg, #000 80%, transparent 100%);
+.spec__ex {
+  grid-column: 2;
+  margin-top: var(--s-2);
+  font-family: var(--font-mono); font-size: var(--fs-micro);
+  color: var(--c-ink-4);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.ascii--collect .ascii__layer {
-  font-size: 10px; line-height: 1.05;
-  color: var(--c-accent); opacity: 0.7;
+.spec__foot {
+  display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-5) var(--s-7);
+  border-top: 1px solid var(--c-line);
+  background: var(--c-surface-2);
+  font-size: var(--fs-micro); font-weight: 560;
+  letter-spacing: var(--tr-micro); text-transform: uppercase;
+  color: var(--c-ink-3);
+}
+.spec__foot .icon { width: 14px; height: 14px; color: var(--c-ink-4); }
+
+@media (min-width: 60rem) {
+  .empty { grid-template-columns: 1fr 0.92fr; gap: var(--s-11); align-items: center; align-content: start; }
+  .empty__viz { display: block; }
 }
 
 /* ==========================================================================
@@ -862,12 +903,13 @@ a:hover { text-decoration: underline; }
 }
 
 .results__head {
-  display: flex; align-items: flex-end; justify-content: space-between;
+  display: flex; align-items: flex-start; justify-content: space-between;
   gap: var(--s-8); flex-wrap: wrap;
   padding-bottom: var(--s-8);
   border-bottom: 1px solid var(--c-line);
 }
 .results__title { min-width: 0; }
+.results__actions { flex: none; padding-top: var(--s-2); }
 .results__display {
   margin-top: var(--s-5);
   font-family: var(--font-display);

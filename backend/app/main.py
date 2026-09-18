@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import sys
 import time
 from contextlib import asynccontextmanager
@@ -16,7 +17,7 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.analysis import AllProvidersFailed, AnalysisChain, AnalysisError
 from app.auth import (
@@ -34,9 +35,11 @@ from app.models import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    ReportExportRequest,
     ServiceInfo,
     StatusResponse,
 )
+from app.pdf import render_report_pdf
 from app.rate_limit import RateLimiter
 from app.suggest.base import SuggestProvider, merge_results
 from app.suggest.google import GoogleSuggestProvider, build_client
@@ -239,6 +242,42 @@ def register_routes(app: FastAPI, settings: Settings) -> None:
         return payload
 
 
+    @app.post("/api/export/report.pdf")
+    async def export_report_pdf(
+        body: ReportExportRequest,
+        _: str = Depends(require_access_key),
+    ) -> Response:
+        """Typeset a report the client already has into a PDF.
+
+        Rendering happens here rather than in the browser so the document gets
+        real pagination, running heads and table layout — none of which a
+        client-side canvas dump would give us. It costs no quota and makes no
+        upstream call.
+        """
+        try:
+            pdf = await asyncio.to_thread(
+                render_report_pdf,
+                topic=body.topic,
+                analysis_markdown=body.analysis_markdown,
+                generated_at=body.generated_at,
+                provider_label=body.provider_label,
+                model=body.model,
+                total_keywords=body.total_keywords,
+                queries_succeeded=body.queries_succeeded,
+                queries_attempted=body.queries_attempted,
+            )
+        except Exception:
+            logger.exception("pdf render failed topic=%r", body.topic)
+            raise HTTPException(status_code=500, detail="The PDF could not be built.")
+
+        filename = pdf_filename(body.topic, body.generated_at)
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+
 async def run_analysis(
     topic: str, settings: Settings, remaining: int, started: float
 ) -> AnalyzeResponse:
@@ -286,6 +325,15 @@ async def run_analysis(
         analysis_provider=analysis.provider,
         analysis_model=analysis.model,
     )
+
+
+
+def pdf_filename(topic: str, generated_at: str) -> str:
+    """ASCII-only, quote-free name — it is interpolated into a header."""
+    slug = re.sub(r"[^a-z0-9]+", "-", topic.lower()).strip("-")[:48] or "report"
+    stamp = re.sub(r"[^0-9]", "", generated_at)[:8]
+    parts = ["intent-report", slug] + ([stamp] if stamp else [])
+    return "-".join(parts) + ".pdf"
 
 
 def log_run(topic: str, payload: AnalyzeResponse, cache_hit: bool) -> None:

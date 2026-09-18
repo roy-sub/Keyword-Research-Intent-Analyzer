@@ -86,3 +86,22 @@ class AnalyzeResponse(BaseModel):
     # this is not necessarily the first-choice provider.
     analysis_provider: AnalysisProviderName
     analysis_model: str
+
+
+class ReportExportRequest(BaseModel):
+    """What the browser posts back to have a report typeset as a PDF.
+
+    The client already holds the finished report, so re-running the analysis
+    to export it would burn quota and could return different prose. It posts
+    the report back instead; every field is treated as untrusted text and is
+    escaped before it reaches the PDF.
+    """
+
+    topic: str = Field(min_length=1, max_length=200)
+    analysis_markdown: str = Field(min_length=1, max_length=200_000)
+    generated_at: str = Field(default="", max_length=64)
+    provider_label: str = Field(default="", max_length=64)
+    model: str = Field(default="", max_length=120)
+    total_keywords: int | None = None
+    queries_succeeded: int | None = None
+    queries_attempted: int | None = None
