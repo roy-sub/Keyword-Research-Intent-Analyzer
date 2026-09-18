@@ -100,20 +100,110 @@ def test_allowed_origin_needs_no_api_key(prod_client):
     assert response.status_code == 200
 
 
-def test_same_origin_browser_get_needs_no_api_key(prod_client):
-    """A same-origin GET sends no Origin but always sends Sec-Fetch-Site."""
+def test_scripted_caller_without_origin_or_api_key_is_rejected(prod_client):
+    """curl and friends send no Origin, so they must carry the API key."""
+    token = login(prod_client)
+    response = prod_client.get("/api/status", headers={"X-Access-Key": token})
+    assert response.status_code == 401
+
+
+def test_scripted_caller_with_api_key_is_allowed(prod_client):
     token = login(prod_client)
     response = prod_client.get(
         "/api/status",
-        headers={"X-Access-Key": token, "Sec-Fetch-Site": "same-origin"},
+        headers={"X-Access-Key": token, "X-API-Key": "super-secret-api-key"},
     )
     assert response.status_code == 200
 
 
-def test_scripted_caller_without_origin_or_api_key_is_rejected(prod_client):
+# ---------------------------------------------------------------------------
+# CORS — the frontend is a separate origin, so this is load-bearing
+# ---------------------------------------------------------------------------
+
+
+def test_preflight_from_the_frontend_origin_is_allowed(prod_client):
+    response = prod_client.options(
+        "/api/analyze",
+        headers={
+            "Origin": PROD_ORIGIN,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type,x-access-key",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == PROD_ORIGIN
+    allowed = response.headers["access-control-allow-headers"].lower()
+    assert "x-access-key" in allowed
+    assert "content-type" in allowed
+
+
+def test_preflight_from_another_origin_is_refused(prod_client):
+    response = prod_client.options(
+        "/api/analyze",
+        headers={
+            "Origin": "https://somewhere-else.example",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert "access-control-allow-origin" not in response.headers
+
+
+def test_allowed_origin_is_echoed_on_a_real_request(prod_client):
     token = login(prod_client)
-    response = prod_client.get("/api/status", headers={"X-Access-Key": token})
-    assert response.status_code == 401
+    response = prod_client.get(
+        "/api/status", headers={"X-Access-Key": token, "Origin": PROD_ORIGIN}
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == PROD_ORIGIN
+
+
+# ---------------------------------------------------------------------------
+# ALLOWED_ORIGINS parsing
+# ---------------------------------------------------------------------------
+
+
+def test_bare_hostname_is_promoted_to_https():
+    """Render's `fromService: property: host` yields a hostname, no scheme."""
+    settings = prod_settings(ALLOWED_ORIGINS="keyword-analyzer.onrender.com")
+    assert settings.allowed_origins == ["https://keyword-analyzer.onrender.com"]
+
+
+def test_multiple_origins_are_parsed_and_trimmed():
+    settings = prod_settings(
+        ALLOWED_ORIGINS=" https://a.example/ , b.example ,, http://localhost:5173 "
+    )
+    assert settings.allowed_origins == [
+        "https://a.example",
+        "https://b.example",
+        "http://localhost:5173",
+    ]
+
+
+def test_bare_hostname_origin_passes_the_api_key_gate(monkeypatch, default_results):
+    """Wiring ALLOWED_ORIGINS straight from Render must still let the UI in."""
+    from fastapi.testclient import TestClient
+
+    settings = prod_settings(ALLOWED_ORIGINS="keyword-analyzer.onrender.com")
+    monkeypatch.setattr("app.auth.get_settings", lambda: settings)
+    monkeypatch.setattr("app.main.get_settings", lambda: settings)
+
+    with TestClient(main.create_app(settings)) as test_client:
+        main.state.provider = FakeProvider(default_results)
+        main.state.analyzer = FakeAnalyzer()
+        main.state.limiter = RateLimiter(10, 60)
+        main.state.cache = TTLCache(1440, 50)
+        reset_session_store()
+
+        origin = "https://keyword-analyzer.onrender.com"
+        token = test_client.post(
+            "/api/login",
+            json={"username": "admin", "password": "test-password"},
+            headers={"Origin": origin},
+        ).json()["access_key"]
+        response = test_client.get(
+            "/api/status", headers={"X-Access-Key": token, "Origin": origin}
+        )
+        assert response.status_code == 200
 
 
 def test_login_itself_is_gated_by_the_api_key(prod_client):
@@ -127,9 +217,12 @@ def test_login_itself_is_gated_by_the_api_key(prod_client):
 
 
 def test_docs_are_disabled_in_prod(prod_client):
-    # /docs and /redoc fall through to the static mount, which has no such file
     assert prod_client.get("/openapi.json").status_code == 404
     assert prod_client.get("/docs").status_code == 404
+
+
+def test_root_descriptor_hides_docs_in_prod(prod_client):
+    assert prod_client.get("/").json()["docs"] is None
 
 
 def test_health_is_open_in_prod(prod_client):

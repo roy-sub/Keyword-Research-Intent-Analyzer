@@ -1,361 +1,199 @@
-# Keyword Suggest & Intent Analyzer — Backend
+# Keyword Suggest & Intent Analyzer
 
-Internal tool. Given a seed topic it collects Google autocomplete
+Internal tool. Give it a seed topic; it collects Google autocomplete
 suggestions, merges them into a deduplicated keyword dataset, sends that
 dataset to Google's Gemini API for a search-intent analysis, and returns both
-the raw data and the AI report as JSON. It also serves the static frontend at
-`/`, so the UI and the API share one origin and one Render web service.
+the raw data and the AI report.
+
+This repository is a **monorepo containing two independently deployable
+applications**:
+
+```
+.
+├── backend/     FastAPI service — collection, AI analysis, auth, quota, cache
+├── frontend/    Static HTML/CSS/JS UI — no build tooling, no npm
+├── render.yaml  Blueprint deploying both as two separate Render services
+├── .gitignore
+└── README.md    (this file)
+```
+
+Each folder is self-contained and has its own README with setup,
+configuration and deployment detail:
+
+- **[backend/README.md](backend/README.md)** — every environment variable,
+  the full API contract, how collection works, how to swap providers.
+- **[frontend/README.md](frontend/README.md)** — how the API URL is
+  configured, mock mode, deployment as a static site.
+
+Neither side depends on the other's internals, on the old single-service
+layout, or on the previously separate frontend repository. **This repo is now
+the only source of truth for the frontend.**
 
 ---
 
-## Quick start
+## Architecture
 
-Two commands, from the repo root, after creating your `.env`:
+Two services, two origins, talking over CORS:
+
+```
+   Browser
+      │
+      │  1. loads the UI
+      ▼
+  ┌──────────────────────────┐
+  │ keyword-analyzer-web     │   Render Static Site  (frontend/)
+  │ index.html + app.js      │
+  │ config.js → API_BASE_URL │
+  └──────────────────────────┘
+      │
+      │  2. fetch(API_BASE_URL + "/api/...")  with X-Access-Key
+      ▼
+  ┌──────────────────────────┐
+  │ keyword-analyzer-api     │   Render Web Service  (backend/)
+  │ FastAPI + uvicorn        │
+  └──────────────────────────┘
+      │                    │
+      ▼                    ▼
+  Google autocomplete   Gemini API
+```
+
+The browser is the only thing that talks to both. The backend never serves
+the frontend, and the frontend has no server-side component.
+
+**The two settings that connect them:**
+
+| Service | Variable | Value |
+|---|---|---|
+| frontend | `API_BASE_URL` | the backend's origin, e.g. `https://keyword-analyzer-api.onrender.com` |
+| backend | `ALLOWED_ORIGINS` | the frontend's origin, e.g. `https://keyword-analyzer-web.onrender.com` |
+
+`render.yaml` wires both automatically with `fromService`, so you never have
+to type either URL. Locally you set them yourself — see below.
+
+---
+
+## Running the whole app locally
+
+You need **two terminals**: the backend and the frontend are separate
+services locally exactly as they are in production.
+
+### Terminal 1 — backend (port 8000)
 
 ```bash
+cd backend
+cp .env.example .env     # then set ADMIN_PASSWORD and GEMINI_API_KEY
 python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt
 ./.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Then open **http://localhost:8000** and sign in with the `ADMIN_USERNAME` /
-`ADMIN_PASSWORD` you put in `.env`.
-
-Create the `.env` first:
+### Terminal 2 — frontend (port 5173)
 
 ```bash
-cp .env.example .env
-# then edit .env and set ADMIN_PASSWORD and GEMINI_API_KEY
+cd frontend
+python3 -m http.server 5173
 ```
 
-`.env.example` documents every variable with a comment and a safe default —
-only `ADMIN_PASSWORD` and `GEMINI_API_KEY` have no default and must be filled
-in. Startup fails with a clear message naming any required variable that is
-missing.
+Then open **http://localhost:5173** and sign in with the `ADMIN_USERNAME` and
+`ADMIN_PASSWORD` from `backend/.env`.
 
-### UI without a backend
+That works with no extra configuration:
 
-`frontend/index.html?mock=1` bypasses login and renders
-`frontend/mock-response.json` — useful for frontend work with no API key.
+- `frontend/config.js` already points at `http://localhost:8000`;
+- the backend in `MODE=dev` accepts any `http://localhost:*` origin, so CORS
+  passes and the API key is not enforced.
 
-### Tests
-
-```bash
-./.venv/bin/python -m pytest
-```
-
-All HTTP is mocked; no test touches Google or Gemini, and none needs real
-credentials.
-
----
-
-## Layout
-
-```
-app/
-  main.py           FastAPI app, routes, static mount, lifespan
-  config.py         settings, env vars, MODE handling, fail-fast validation
-  auth.py           login, session tokens, API-key enforcement
-  rate_limit.py     global sliding-window search quota
-  cache.py          TTL + LRU cache
-  models.py         request/response models (the API contract)
-  analysis.py       Gemini client and prompt
-  suggest/
-    base.py         SuggestProvider protocol, query set, dedupe, merge
-    google.py       GoogleSuggestProvider
-frontend/           static UI, served at /
-tests/
-render.yaml
-.env.example
-```
-
----
-
-## Environment variables
-
-Every variable, its default, and what it does. All are read through
-`pydantic-settings` from the environment, falling back to `.env`.
-
-### Mode
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `MODE` | `dev` | `dev` or `prod`. See the table below. |
-
-|  | `dev` | `prod` |
-|---|---|---|
-| Frontend at `/` | yes | yes |
-| CORS | any `http://localhost:*` / `http://127.0.0.1:*` | exactly `ALLOWED_ORIGINS` |
-| `X-API-Key` | not enforced | required for callers outside `ALLOWED_ORIGINS` |
-| `/docs`, `/redoc`, `/openapi.json` | enabled | disabled (404) |
-| Logs | verbose, with module and line | concise |
-| Startup validation | `ADMIN_PASSWORD`, `GEMINI_API_KEY` | those plus `API_KEY`, `ALLOWED_ORIGINS` |
-
-Dev works locally with zero extra setup beyond the two required secrets.
-
-### Access
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `ADMIN_USERNAME` | `admin` | The single admin login. There are no other accounts. |
-| `ADMIN_PASSWORD` | **required** | No default. Startup fails without it. |
-| `SESSION_TTL_HOURS` | `12` | How long an issued session token stays valid. |
-| `API_KEY` | **required in prod** | Guards the API against callers outside the app. |
-| `ALLOWED_ORIGINS` | empty | Comma-separated origins allowed in prod, e.g. `https://keyword-analyzer.onrender.com`. |
-
-### AI
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `GEMINI_API_KEY` | **required** | No default. From https://aistudio.google.com/apikey |
-| `GEMINI_MODEL` | `gemini-3.5-flash` | Model used for the report. |
-| `GEMINI_TIMEOUT_SECONDS` | `120` | Per-call timeout. |
-| `MAX_KEYWORDS_IN_PROMPT` | `600` | Prompt cap; truncation is noted in the prompt itself. |
-
-### Collection
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `SUGGEST_LANG` | `en` | Autocomplete `hl`. |
-| `SUGGEST_COUNTRY` | `us` | Autocomplete `gl`. |
-| `SUGGEST_DELAY_SECONDS` | `1.0` | Delay between consecutive requests, plus random jitter. |
-| `SUGGEST_TIMEOUT_SECONDS` | `5.0` | Per-request timeout. |
-| `SUGGEST_MAX_RETRIES` | `2` | Retries per query on timeout / 429 / 5xx. |
-| `SUGGEST_QUESTION_MODIFIERS` | `who,what,when,where,why,how` | Prefixed to the seed. |
-| `SUGGEST_COMMERCIAL_MODIFIERS` | `best,buy,cheap,near me` | `near me` is appended; the rest prefixed. |
-
-### Limits and logging
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `RATE_LIMIT_MAX_SEARCHES` | `10` | Fresh runs allowed per window, globally. |
-| `RATE_LIMIT_WINDOW_MINUTES` | `60` | Window length. |
-| `CACHE_TTL_MINUTES` | `1440` | How long a completed run is reused (24h). |
-| `CACHE_MAX_ENTRIES` | `50` | Cached runs before LRU eviction. |
-| `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
-
----
-
-## Authentication
-
-There is one user: the admin.
-
-1. `POST /api/login` with `{"username", "password"}`. Both are compared with
-   `secrets.compare_digest`. On success the server mints a random opaque
-   token (`secrets.token_urlsafe(32)`), holds it in memory for
-   `SESSION_TTL_HOURS`, and returns it as `access_key`.
-2. The frontend stores **only that token** in `sessionStorage` — never the
-   password — and sends it as `X-Access-Key` on every other `/api/*` call.
-3. `POST /api/logout` invalidates the token. A 401 anywhere clears the stored
-   token and returns the user to the sign-in gate.
-
-A failed login costs a constant ~0.75s delay, to blunt brute forcing.
-
-### About `API_KEY`
-
-When `MODE=prod`, a request whose `Origin` is not in `ALLOWED_ORIGINS` must
-also carry `X-API-Key`. Same-origin requests from the served frontend pass
-without it: a browser sends `Origin` on cross-origin requests and same-origin
-POSTs, and `Sec-Fetch-Site: same-origin` on same-origin GETs.
-
-**A key that the browser can see is never truly secret.** Anyone who can open
-the site can read the network tab. `API_KEY` is a nuisance gate that keeps
-casual external callers and scrapers off the endpoint — nothing more. **The
-login is the real access control.** Treat `ADMIN_PASSWORD` as the secret that
-matters, and rotate it rather than the API key if you suspect a leak.
-
----
-
-## API contract
-
-All bodies are JSON. Auth is `X-Access-Key: <token>` unless noted.
-
-### `GET /api/health` — no auth
-
-```json
-{"status": "ok"}
-```
-
-Touches nothing upstream; this is Render's health check path. It stays
-responsive during a 40-second run — the collection pipeline never blocks the
-event loop (verified: health answered in ~1ms throughout a full 37-query run).
-
-### `GET /api/status`
-
-```json
-{
-  "searches_remaining": 7,
-  "window_minutes": 60,
-  "retry_after_seconds": 0,
-  "request_delay_seconds": 1.0,
-  "expected_queries": 37
-}
-```
-
-### `POST /api/analyze`
-
-Request: `{"topic": "luxury villa rentals"}`
-
-```json
-{
-  "topic": "luxury villa rentals",
-  "generated_at": "2026-09-18T09:14:03Z",
-  "cached": false,
-  "duration_seconds": 42.7,
-  "total_keywords": 284,
-  "queries_attempted": 37,
-  "queries_succeeded": 37,
-  "failed_queries": [],
-  "searches_remaining": 6,
-  "sources": [
-    {"query": "luxury villa rentals", "type": "seed", "keywords": ["luxury villa rentals italy"]},
-    {"query": "luxury villa rentals a", "type": "alphabet", "keywords": ["luxury villa rentals amalfi coast"]}
-  ],
-  "keywords": [
-    {"keyword": "luxury villa rentals italy", "sources": ["luxury villa rentals"], "types": ["seed"]}
-  ],
-  "analysis_markdown": "## 1. Search Intent Classification\n..."
-}
-```
-
-- `type` is one of `seed`, `alphabet`, `question`, `commercial`.
-- `sources` preserves the exact query that produced each suggestion. It is
-  the client's verification data and is never flattened away.
-- `keywords` is the deduplicated union, sorted alphabetically
-  (case-insensitive), each entry carrying every source query and type that
-  produced it. Dedupe is case-insensitive and keeps the first occurrence's
-  casing.
-
-Errors:
-
-| Status | Body |
-|---|---|
-| 400 | `{"detail": "Topic must not be empty."}` / `{"detail": "Topic must be 100 characters or fewer."}` |
-| 401 | `{"detail": "Invalid or missing access key."}` / `{"detail": "Invalid or missing API key."}` |
-| 429 | `{"detail": "Search limit reached.", "retry_after_seconds": 1840}` plus a `Retry-After` header |
-| 502 | `{"detail": "Google returned no suggestions."}` / `{"detail": "AI analysis failed: <reason>"}` |
-| 504 | `{"detail": "The run timed out."}` |
-
-No key, traceback, or upstream response body ever appears in `detail`.
-
-### `POST /api/login`, `POST /api/logout`
-
-See **Authentication** above.
-
-### `GET /` and static assets
-
-`frontend/` is served via `StaticFiles` with `index.html` at the root. API
-routes are registered before the static mount, so `/api/*` always wins.
-
----
-
-## How collection works
-
-- `https://suggestqueries.google.com/complete/search` over HTTPS, with
-  `client=firefox`, `q`, `hl`, `gl`. Suggestions are at index 1 of the array.
-- **Query set (37 by default):** the seed alone, the seed plus each letter
-  a–z, then the question and commercial modifiers. Modifier lists come from
-  config, not from the code.
-- **Pacing:** requests run strictly sequentially with `SUGGEST_DELAY_SECONDS`
-  plus up to 30% random jitter between each pair. Never concurrent. This is a
-  deliberate requirement, not an accident of implementation.
-- **Retries:** per-request timeout, then exponential backoff on timeouts,
-  429s and 5xx, honouring `Retry-After` when present.
-- **Decoding:** the endpoint does not always return UTF-8. The declared
-  charset is tried first, then UTF-8, then latin-1, then a replacement
-  decode. It never raises on a mis-labelled body.
-- **Failures are never swallowed.** Every failed query is logged with its
-  status and lands in `failed_queries`. Some failing → partial results with
-  accurate counts. All failing → 502.
-
-Swapping providers: routes depend on the `SuggestProvider` protocol in
-`app/suggest/base.py`, not on Google. A paid provider (SerpApi, DataForSEO)
-only needs `async def fetch(topic, lang, country) -> list[SourceResult]` and
-a one-line swap in `build_state()` in `app/main.py`.
-
----
-
-## Changing things without touching code
-
-**The AI model** — edit `GEMINI_MODEL` in `.env` (or in Render's environment)
-and restart. No model name appears anywhere in the code.
-
-> `gemini-2.5-flash` is being retired — do not use it. The default is
-> `gemini-3.5-flash`. Check Google's current model list before changing it.
-
-**The rate limit** — edit `RATE_LIMIT_MAX_SEARCHES` and
-`RATE_LIMIT_WINDOW_MINUTES` and restart.
-
-**The pacing, timeouts, market, or modifier words** — the `SUGGEST_*`
-variables. Changing the delay or timeout automatically widens the per-run
-timeout budget, so a slower run cannot start timing out by surprise.
+The exact commands, including how to test each side, are in
+[backend/README.md](backend/README.md) and
+[frontend/README.md](frontend/README.md).
 
 ---
 
 ## Deploying to Render
 
-1. Push this repo to GitHub.
-2. In Render, **New → Blueprint**, point it at this repo. `render.yaml`
-   defines one web service.
-3. Render prompts for the values marked `sync: false`: `ADMIN_PASSWORD`,
-   `API_KEY`, `GEMINI_API_KEY`, `ALLOWED_ORIGINS`. Set `ALLOWED_ORIGINS` to
-   the service's own public URL, e.g.
-   `https://keyword-analyzer.onrender.com`.
-4. Build command: `pip install -r requirements.txt`
-   Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   Health check path: `/api/health`
+Both services come from this one repo, each built from its own folder.
 
-`MODE` is set to `prod` in the blueprint, so docs are disabled, CORS is
-locked to `ALLOWED_ORIGINS`, and the API key is enforced for outside callers.
+### With the blueprint (recommended)
+
+1. Push this repo to GitHub.
+2. In Render: **New → Blueprint**, point it at this repo. It reads
+   `render.yaml` and creates both services.
+3. Render prompts for the three secrets on the API service:
+   `ADMIN_PASSWORD`, `API_KEY`, `GEMINI_API_KEY`.
+4. Deploy. `ALLOWED_ORIGINS` and `API_BASE_URL` are filled in automatically
+   from each service's hostname, so there is no chicken-and-egg with URLs and
+   nothing to paste by hand.
+
+### Manually, as two services
+
+If you prefer to create them by hand rather than from the blueprint:
+
+| | Backend | Frontend |
+|---|---|---|
+| Type | Web Service | Static Site |
+| Root directory | `backend` | `frontend` |
+| Runtime | Python 3 | Static |
+| Build command | `pip install -r requirements.txt` | `./build.sh` |
+| Start command | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` | — |
+| Publish directory | — | `.` |
+| Health check path | `/api/health` | — |
+
+Then set the environment variables. Create the backend first, note its URL,
+and set the frontend's `API_BASE_URL` to it; then set the backend's
+`ALLOWED_ORIGINS` to the frontend's URL and redeploy the backend. The full
+variable list is in [backend/README.md](backend/README.md).
+
+> Redeploy the **frontend** after changing `API_BASE_URL` — `config.js` is
+> generated at build time, so the new value only takes effect on a rebuild.
 
 ---
 
-## Re-syncing the frontend
-
-**The frontend repo is the source of truth:**
-https://github.com/roy-sub/Keyword-Research-Intent-Analyzer-Frontend
-
-`frontend/` here is a copy, so that this repo alone is deployable. After a
-change lands there:
+## Verifying a deployment
 
 ```bash
-git clone https://github.com/roy-sub/Keyword-Research-Intent-Analyzer-Frontend.git /tmp/kria-fe
-cp /tmp/kria-fe/index.html /tmp/kria-fe/styles.css /tmp/kria-fe/app.js /tmp/kria-fe/mock-response.json frontend/
-git add frontend && git commit -m "Sync frontend from source repo" && git push
+# 1. The API is up (no auth required)
+curl https://<api-host>/api/health
+# -> {"status":"ok"}
+
+# 2. In prod, an outside caller is refused without the API key
+curl -i https://<api-host>/api/status -H "X-Access-Key: anything"
+# -> 401 {"detail":"Invalid or missing API key."}
+
+# 3. The UI is up and points at the right backend
+curl https://<web-host>/config.js
+# -> window.APP_CONFIG = { API_BASE_URL: "https://<api-host>" };
 ```
 
-Never edit `frontend/` here directly — the next sync would overwrite it.
+Then open the frontend URL and sign in. If the UI loads but every call fails,
+the cause is almost always one of those two URL settings — check the browser
+console for a CORS error naming the origin the backend rejected.
+
+---
+
+## Security model in one paragraph
+
+There is a single admin login. `POST /api/login` exchanges a username and
+password for an opaque session token, which the browser keeps in
+`sessionStorage` and sends as `X-Access-Key`; the password is never stored
+client-side. In `MODE=prod` the backend additionally requires `X-API-Key`
+from any caller whose `Origin` is not in `ALLOWED_ORIGINS` — that keeps
+casual external callers off the endpoint, but a key the browser can see is
+never truly secret, so **the login is the real access control**. Treat
+`ADMIN_PASSWORD` as the secret that matters.
 
 ---
 
 ## Known limitations
 
-- **Quota and cache are in-process and reset on restart.** A Render redeploy
-  or a cold start clears both the search quota and every cached run, and
-  signs the admin out. This is accepted for V1: it assumes a single
-  instance. Running more than one instance means moving the rate limiter,
-  the cache, and the session store to Redis — they are already isolated
-  behind small classes, so that is a contained change.
-- **The Google suggest endpoint is unofficial.** It is undocumented,
-  unsupported, and may change shape, rate-limit, or block outright at any
-  time — and it throttles cloud IP ranges considerably harder than
-  residential ones. A run from Render may see more `failed_queries` than the
-  same run from a laptop, or may fail entirely with a 502 where local runs
-  succeed. That is the endpoint's behaviour, not a bug. If it becomes
-  unusable, swap in a paid provider behind `SuggestProvider`.
-- **The rate limit is global, not per user.** There is one shared login, so
-  the limit protects the upstream endpoints rather than individual callers.
-- **The browser-delivered `API_KEY` is not a secret.** See
-  **Authentication** above.
+- **Quota, cache and sessions are in-process.** A backend restart or
+  redeploy clears the search quota and every cached run, and signs the admin
+  out. V1 assumes a single backend instance; running more than one means
+  moving those three stores to Redis.
+- **The Google suggest endpoint is unofficial.** Undocumented, unsupported,
+  and it throttles cloud IP ranges much harder than residential ones. A run
+  from Render may see more `failed_queries` than the same run from a laptop,
+  or may fail outright with a 502. That is the endpoint's behaviour, not a
+  bug.
+- **The rate limit is global, not per user**, because there is one shared
+  login.
 
----
-
-## Logging
-
-One structured line per run:
-
-```
-run topic='villa rentals' duration=42.7s queries=37/37 keywords=284 cached=False quota_remaining=6
-```
-
-Credentials are never logged, never returned in an error body, and never put
-into a prompt.
+Details and mitigations are in [backend/README.md](backend/README.md).

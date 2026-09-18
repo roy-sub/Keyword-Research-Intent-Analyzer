@@ -269,18 +269,24 @@ def test_cache_hit_costs_no_quota_and_no_upstream_call(client, auth):
 
 
 # ---------------------------------------------------------------------------
-# Static frontend
+# Service descriptor
 # ---------------------------------------------------------------------------
 
 
-def test_frontend_is_served_at_the_root(client):
-    test_client, _p, _a = client
+def test_root_returns_a_service_descriptor(client):
+    """This service is API-only; the UI is a separate Render service."""
+    test_client, provider, analyzer = client
     response = test_client.get("/")
     assert response.status_code == 200
-    assert "Keyword Suggest" in response.text
-    assert "gate-username" in response.text
+    body = response.json()
+    assert body["service"] == "keyword-suggest-intent-analyzer-api"
+    assert body["status"] == "ok"
+    assert provider.calls == 0
+    assert analyzer.calls == 0
 
 
-def test_api_routes_take_precedence_over_static(client):
+def test_no_static_files_are_served(client):
+    """Nothing from the frontend folder is reachable through the API service."""
     test_client, _p, _a = client
-    assert test_client.get("/api/health").json() == {"status": "ok"}
+    for path in ("/index.html", "/app.js", "/styles.css", "/config.js"):
+        assert test_client.get(path).status_code == 404, path

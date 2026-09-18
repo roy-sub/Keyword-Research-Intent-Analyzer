@@ -113,10 +113,11 @@ def _origin_of(url_like: str) -> str:
 def enforce_api_key(request: Request, settings: Settings) -> None:
     """In prod, callers outside ALLOWED_ORIGINS must present X-API-Key.
 
-    A browser sends `Origin` on cross-origin requests and on same-origin
-    POSTs; for a same-origin GET it sends no `Origin` but always sends
-    `Sec-Fetch-Site: same-origin`. Anything else — curl, a script, another
-    site — has to carry the key.
+    The frontend is deployed as its own Render service on its own origin, so
+    every browser call to this API is cross-origin and always carries an
+    `Origin` header. That makes the check simple: an `Origin` listed in
+    ALLOWED_ORIGINS is the app itself and passes; anything else — curl, a
+    script, another site — has to carry the key.
 
     This is a nuisance gate, not a secret: see the README.
     """
@@ -124,10 +125,7 @@ def enforce_api_key(request: Request, settings: Settings) -> None:
         return
 
     origin = (request.headers.get("origin") or "").strip().rstrip("/")
-    if origin:
-        if origin in settings.allowed_origins:
-            return
-    elif request.headers.get("sec-fetch-site") == "same-origin":
+    if origin and origin in settings.allowed_origins:
         return
 
     supplied = request.headers.get("x-api-key") or ""

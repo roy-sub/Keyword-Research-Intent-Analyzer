@@ -1,15 +1,30 @@
-# Render blueprint. One web service serves both the API and the static
-# frontend, so the UI and the API share an origin.
+# Render blueprint for the whole monorepo.
 #
-# Values marked `sync: false` are secrets: Render prompts for them on first
-# deploy and never stores them in this file or in git.
+# Two independent services, each built from its own folder via `rootDir`:
+#
+#   keyword-analyzer-api   — the FastAPI backend   (backend/)
+#   keyword-analyzer-web   — the static frontend   (frontend/)
+#
+# They are wired to each other with `fromService`, so you do NOT need to know
+# either URL in advance:
+#
+#   * the web service receives the API's hostname as API_BASE_URL, which
+#     frontend/build.sh turns into config.js at build time;
+#   * the API receives the web service's hostname as ALLOWED_ORIGINS, which
+#     the backend promotes to https://<host> for CORS and the API-key gate.
+#
+# `sync: false` marks a secret: Render prompts for it on first deploy and
+# never stores it in this file or in git.
+
 services:
+  # ---------------------------------------------------------------- backend
   - type: web
-    name: keyword-intent-analyzer
+    name: keyword-analyzer-api
     runtime: python
     plan: starter
     region: oregon
     branch: main
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
@@ -30,8 +45,13 @@ services:
         value: "12"
       - key: API_KEY
         sync: false          # secret
+      # The frontend service's hostname. The backend promotes a bare host to
+      # https://<host>, so this works with no scheme.
       - key: ALLOWED_ORIGINS
-        sync: false          # set to this service's public URL
+        fromService:
+          type: web
+          name: keyword-analyzer-web
+          property: host
 
       # ---- AI ----
       - key: GEMINI_API_KEY
@@ -70,3 +90,31 @@ services:
         value: "50"
       - key: LOG_LEVEL
         value: INFO
+
+  # --------------------------------------------------------------- frontend
+  - type: web
+    name: keyword-analyzer-web
+    runtime: static
+    plan: starter
+    branch: main
+    rootDir: frontend
+    buildCommand: ./build.sh
+    staticPublishPath: .
+    envVars:
+      # The API service's hostname; build.sh promotes it to https://<host>.
+      - key: API_BASE_URL
+        fromService:
+          type: web
+          name: keyword-analyzer-api
+          property: host
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      # config.js is regenerated per deploy; never let a browser cache it.
+      - path: /config.js
+        name: Cache-Control
+        value: no-store

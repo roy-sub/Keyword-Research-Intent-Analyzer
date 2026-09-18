@@ -82,7 +82,21 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins(self) -> list[str]:
-        return [o.strip().rstrip("/") for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        """Parsed ALLOWED_ORIGINS, normalised to full origins.
+
+        A bare hostname is promoted to https://<host>, so the value can be
+        wired straight from Render's `fromService: property: host`, which
+        yields a hostname with no scheme.
+        """
+        origins: list[str] = []
+        for raw in self.ALLOWED_ORIGINS.split(","):
+            value = raw.strip().rstrip("/")
+            if not value:
+                continue
+            if "://" not in value:
+                value = f"https://{value}"
+            origins.append(value)
+        return origins
 
     @property
     def question_modifiers(self) -> list[str]:
@@ -116,8 +130,12 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_regex(self) -> str | None:
-        """In dev, allow any localhost / 127.0.0.1 port so a separately served
-        frontend (e.g. `python3 -m http.server 8000`) still works."""
+        """In dev, allow any localhost / 127.0.0.1 port.
+
+        The frontend is a separate service and is served on its own port
+        locally (see frontend/README.md), so every browser call to the API is
+        cross-origin even on a laptop.
+        """
         if self.is_prod:
             return None
         return r"http://(localhost|127\.0\.0\.1)(:\d+)?"

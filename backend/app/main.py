@@ -1,7 +1,8 @@
-"""FastAPI application: routes, static frontend, lifespan wiring.
+"""FastAPI application: routes and lifespan wiring.
 
-API routes are declared before the static mount, so /api/* always wins over a
-file of the same name in frontend/.
+This service is API-only. The frontend is a separate Render service with its
+own origin, so the browser reaches this API cross-origin and CORS plus
+ALLOWED_ORIGINS are what let it through.
 """
 
 from __future__ import annotations
@@ -12,12 +13,10 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.analysis import AnalysisError, GeminiAnalyzer
 from app.auth import (
@@ -35,6 +34,7 @@ from app.models import (
     LoginRequest,
     LoginResponse,
     LogoutResponse,
+    ServiceInfo,
     StatusResponse,
 )
 from app.rate_limit import RateLimiter
@@ -43,7 +43,6 @@ from app.suggest.google import GoogleSuggestProvider, build_client
 
 logger = logging.getLogger(__name__)
 
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
 MAX_TOPIC_LENGTH = 100
 
 
@@ -123,13 +122,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
 
     register_routes(app, settings)
-
-    # Declared last: /api/* above takes precedence over any static file.
-    if FRONTEND_DIR.is_dir():
-        app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
-    else:  # pragma: no cover - only hit if the frontend was not copied in
-        logger.warning("frontend directory missing at %s; serving API only", FRONTEND_DIR)
-
     return app
 
 
@@ -139,6 +131,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
 
 def register_routes(app: FastAPI, settings: Settings) -> None:
+    @app.get("/", response_model=ServiceInfo)
+    async def root() -> ServiceInfo:
+        """A small descriptor, so hitting the API host in a browser explains
+        itself instead of returning a bare 404. The UI lives elsewhere."""
+        return ServiceInfo(
+            service="keyword-suggest-intent-analyzer-api",
+            status="ok",
+            docs="/docs" if not get_settings().is_prod else None,
+        )
+
     @app.get("/api/health", response_model=HealthResponse)
     async def health() -> HealthResponse:
         """No auth, no upstream calls — Render's health check hits this."""

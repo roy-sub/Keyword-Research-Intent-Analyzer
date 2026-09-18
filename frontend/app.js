@@ -1,11 +1,13 @@
 /* ==========================================================================
    Keyword Suggest & Intent Analyzer — app logic
 
-   Talks to a backend (built separately) at relative /api/... paths on the
-   same origin. Add ?mock=1 to the URL to bypass the backend entirely and
-   exercise the whole UI against frontend/mock-response.json — mock and real
-   runs both end in the same handleAnalyzeSuccess()/handleAnalyzeError()
-   functions, so there is exactly one rendering path for results.
+   The backend is a separate service on its own origin. Its base URL comes
+   from window.APP_CONFIG.API_BASE_URL in config.js, which build.sh rewrites
+   at deploy time; an empty value means "same origin as this page".
+
+   Add ?mock=1 to the URL to bypass the backend entirely and exercise the
+   whole UI against mock-response.json — mock and real runs both end in the
+   same rendering path for results.
    ========================================================================== */
 
 (function () {
@@ -18,6 +20,11 @@
   /* Holds the opaque session token returned by POST /api/login. The
      password itself is never stored. */
   const ACCESS_KEY_STORAGE = "kria_access_key";
+
+  /* Backend origin, without a trailing slash. Empty means same-origin. */
+  const API_BASE_URL = String(
+    (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || ""
+  ).replace(/\/+$/, "");
   const CLIENT_TIMEOUT_MS = 180000;
   const RUN_STAGE_SWITCH_SECONDS = 35;
   const MOCK_DELAY_MS = 6000;
@@ -177,6 +184,12 @@
      API
      ------------------------------------------------------------------ */
 
+  /* Every API path goes through here, so there is one place that knows
+     where the backend lives. */
+  function apiUrl(path) {
+    return API_BASE_URL + path;
+  }
+
   class ApiError extends Error {
     constructor(status, body) {
       super((body && body.detail) || "Request failed");
@@ -186,7 +199,7 @@
   }
 
   async function apiLogin(username, password) {
-    const res = await fetch("/api/login", {
+    const res = await fetch(apiUrl("/api/login"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password })
@@ -196,7 +209,7 @@
   }
 
   async function apiStatus() {
-    const res = await fetch("/api/status", {
+    const res = await fetch(apiUrl("/api/status"), {
       headers: { "X-Access-Key": state.accessKey }
     });
     if (!res.ok) throw new ApiError(res.status, await safeJson(res));
@@ -204,7 +217,7 @@
   }
 
   async function apiAnalyze(topic, signal) {
-    const res = await fetch("/api/analyze", {
+    const res = await fetch(apiUrl("/api/analyze"), {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Access-Key": state.accessKey },
       body: JSON.stringify({ topic }),
@@ -719,7 +732,7 @@
     if (key) {
       /* Best effort: the local session is already gone either way. */
       try {
-        await fetch("/api/logout", { method: "POST", headers: { "X-Access-Key": key } });
+        await fetch(apiUrl("/api/logout"), { method: "POST", headers: { "X-Access-Key": key } });
       } catch (e) { /* ignore */ }
     }
   });

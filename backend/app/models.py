@@ -32,6 +32,14 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class ServiceInfo(BaseModel):
+    """Returned by GET / so the API host identifies itself in a browser."""
+
+    service: str
+    status: str
+    docs: str | None = None
+
+
 class StatusResponse(BaseModel):
     searches_remaining: int
     window_minutes: int
