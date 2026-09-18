@@ -17,13 +17,13 @@ two independently deployable Render services.
    Browser
       │  loads the UI
       ▼
-  keyword-analyzer-web          Render Static Site   (rootDir: frontend/)
+  keyword-research-frontend         Render Static Site   (rootDir: frontend/)
   index.html · styles.css · app.js
   config.js  ← generated at build time from API_BASE_URL
       │
       │  XHR with X-Access-Key, cross-origin
       ▼
-  keyword-analyzer-api          Render Web Service   (rootDir: backend/)
+  keyword-research-backend          Render Web Service   (rootDir: backend/)
   FastAPI · uvicorn · Python 3.11
       │
       ├── Google autocomplete   (37 paced sequential queries)
@@ -38,8 +38,8 @@ so **neither URL has to be known in advance**:
 - the API receives the web service's hostname as `ALLOWED_ORIGINS`, which the
   backend promotes to `https://<host>` for CORS and the API-key gate.
 
-> **Do not rename the Render services.** `keyword-analyzer-api` and
-> `keyword-analyzer-web` are infrastructure ids referenced by `fromService`.
+> **Do not rename the Render services.** `keyword-research-backend` and
+> `keyword-research-frontend` are infrastructure ids referenced by `fromService`.
 > Renaming them orphans the deployed services and creates new ones.
 
 ---
@@ -211,7 +211,7 @@ from each other automatically.
 
 ### Service settings already in the blueprint
 
-| | `keyword-analyzer-api` | `keyword-analyzer-web` |
+| | `keyword-research-backend` | `keyword-research-frontend` |
 |---|---|---|
 | Type | Web Service | Static Site |
 | Runtime | Python 3.11.9 | static |
@@ -228,7 +228,7 @@ stale API URL.
 
 ### Rotating a secret
 
-Change it in the Render dashboard for `keyword-analyzer-api` and redeploy
+Change it in the Render dashboard for `keyword-research-backend` and redeploy
 that service only. The frontend does not hold any secret.
 
 ---
@@ -332,27 +332,27 @@ Downloads live in the tab that owns the data, not in a header menu.
 
 ```bash
 # 1. Health (no auth)
-curl https://keyword-analyzer-api.onrender.com/api/health
+curl https://keyword-research-backend.onrender.com/api/health
 # → {"status":"ok"}
 
 # 2. Docs must be closed in prod
 curl -o /dev/null -w '%{http_code}\n' \
-  https://keyword-analyzer-api.onrender.com/docs
+  https://keyword-research-backend.onrender.com/docs
 # → 404
 
 # 3. Sign in
-TOKEN=$(curl -s https://keyword-analyzer-api.onrender.com/api/login \
+TOKEN=$(curl -s https://keyword-research-backend.onrender.com/api/login \
   -H 'Content-Type: application/json' \
   -H "X-API-Key: $API_KEY" \
   -d '{"username":"admin","password":"<ADMIN_PASSWORD>"}' \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_key"])')
 
 # 4. Quota and run parameters
-curl -s https://keyword-analyzer-api.onrender.com/api/status \
+curl -s https://keyword-research-backend.onrender.com/api/status \
   -H "X-Access-Key: $TOKEN"
 
 # 5. The UI must point at the API, not localhost
-curl -s https://keyword-analyzer-web.onrender.com/config.js
+curl -s https://keyword-research-frontend.onrender.com/config.js
 ```
 
 Then open the web service, sign in, and run one topic end to end.

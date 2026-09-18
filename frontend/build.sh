@@ -13,7 +13,7 @@ set -euo pipefail
 
 if [ -z "${API_BASE_URL:-}" ]; then
   echo "ERROR: API_BASE_URL is not set." >&2
-  echo "Set it to the backend service origin, e.g. https://keyword-analyzer-api.onrender.com" >&2
+  echo "Set it to the backend service origin, e.g. https://keyword-research-backend.onrender.com" >&2
   exit 1
 fi
 

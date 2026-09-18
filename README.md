@@ -60,7 +60,7 @@ The interface is built on a single design system documented in
 
 All text pairs meet WCAG AA, verified by computing ratios from the tokens.
 
-> Render **service names** (`keyword-analyzer-api`, `keyword-analyzer-web`)
+> Render **service names** (`keyword-research-backend`, `keyword-research-frontend`)
 > are intentionally unchanged. Renaming them in `render.yaml` would orphan an
 > already-deployed service and create new ones. They are infrastructure ids,
 > not brand surface.
@@ -76,18 +76,18 @@ Two services, two origins, talking over CORS:
       │
       │  1. loads the UI
       ▼
-  ┌──────────────────────────┐
-  │ keyword-analyzer-web     │   Render Static Site  (frontend/)
-  │ index.html + app.js      │
-  │ config.js → API_BASE_URL │
-  └──────────────────────────┘
+  ┌───────────────────────────┐
+  │ keyword-research-frontend │   Render Static Site  (frontend/)
+  │ index.html + app.js       │
+  │ config.js → API_BASE_URL  │
+  └───────────────────────────┘
       │
       │  2. fetch(API_BASE_URL + "/api/...")  with X-Access-Key
       ▼
-  ┌──────────────────────────┐
-  │ keyword-analyzer-api     │   Render Web Service  (backend/)
-  │ FastAPI + uvicorn        │
-  └──────────────────────────┘
+  ┌───────────────────────────┐
+  │ keyword-research-backend  │   Render Web Service  (backend/)
+  │ FastAPI + uvicorn         │
+  └───────────────────────────┘
       │                    │
       ▼                    ▼
   Google autocomplete   Claude → OpenAI → Gemini
@@ -100,8 +100,8 @@ the frontend, and the frontend has no server-side component.
 
 | Service | Variable | Value |
 |---|---|---|
-| frontend | `API_BASE_URL` | the backend's origin, e.g. `https://keyword-analyzer-api.onrender.com` |
-| backend | `ALLOWED_ORIGINS` | the frontend's origin, e.g. `https://keyword-analyzer-web.onrender.com` |
+| frontend | `API_BASE_URL` | the backend's origin, e.g. `https://keyword-research-backend.onrender.com` |
+| backend | `ALLOWED_ORIGINS` | the frontend's origin, e.g. `https://keyword-research-frontend.onrender.com` |
 
 `render.yaml` wires both automatically with `fromService`, so you never have
 to type either URL. Locally you set them yourself — see below.

@@ -2,8 +2,8 @@
 #
 # Two independent services, each built from its own folder via `rootDir`:
 #
-#   keyword-analyzer-api   — the FastAPI backend   (backend/)
-#   keyword-analyzer-web   — the static frontend   (frontend/)
+#   keyword-research-backend    — the FastAPI backend   (backend/)
+#   keyword-research-frontend   — the static frontend   (frontend/)
 #
 # They are wired to each other with `fromService`, so you do NOT need to know
 # either URL in advance:
@@ -19,7 +19,7 @@
 services:
   # ---------------------------------------------------------------- backend
   - type: web
-    name: keyword-analyzer-api
+    name: keyword-research-backend
     runtime: python
     plan: starter
     region: oregon
@@ -50,7 +50,7 @@ services:
       - key: ALLOWED_ORIGINS
         fromService:
           type: web
-          name: keyword-analyzer-web
+          name: keyword-research-frontend
           property: host
 
       # ---- AI ----
@@ -106,7 +106,7 @@ services:
 
   # --------------------------------------------------------------- frontend
   - type: web
-    name: keyword-analyzer-web
+    name: keyword-research-frontend
     runtime: static
     plan: starter
     branch: main
@@ -118,7 +118,7 @@ services:
       - key: API_BASE_URL
         fromService:
           type: web
-          name: keyword-analyzer-api
+          name: keyword-research-backend
           property: host
     headers:
       - path: /*

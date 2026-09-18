@@ -226,7 +226,7 @@ A small descriptor, so hitting the API host in a browser explains itself
 instead of returning a bare 404.
 
 ```json
-{"service": "keyword-analyzer-api", "status": "ok", "docs": "/docs"}
+{"service": "keyword-research-backend", "status": "ok", "docs": "/docs"}
 ```
 
 `docs` is `null` in prod.
@@ -483,7 +483,7 @@ timeout budget, so a slower run cannot start timing out by surprise.
 
 ## Deploying to Render
 
-Deployed by the root `render.yaml` as `keyword-analyzer-api`, or manually:
+Deployed by the root `render.yaml` as `keyword-research-backend`, or manually:
 
 | Setting | Value |
 |---|---|
