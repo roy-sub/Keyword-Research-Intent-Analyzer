@@ -126,19 +126,29 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins(self) -> list[str]:
-        return self.allowed_origins
+        """Origins the browser may call this API from.
+
+        In prod this is exactly ALLOWED_ORIGINS. In dev it is everything.
+
+        Dev is deliberately wide open. The frontend is a separate service on
+        its own port, so every browser call is cross-origin even on a laptop,
+        and the origin it arrives from depends on how you opened the page:
+        `python3 -m http.server` prints "Serving HTTP on 0.0.0.0", so people
+        reasonably browse to http://0.0.0.0:5173 — and a localhost-only
+        allowlist then rejects the CORS preflight with a 400, which surfaces
+        in the UI as the misleading "Could not reach the server". Reaching
+        the dev server from a phone on the same Wi-Fi has the same problem.
+        None of that is worth debugging on a local machine, and dev already
+        does not enforce the API key, so the allowlist buys nothing here.
+        """
+        if self.is_prod:
+            return self.allowed_origins
+        return ["*"]
 
     @property
     def cors_origin_regex(self) -> str | None:
-        """In dev, allow any localhost / 127.0.0.1 port.
-
-        The frontend is a separate service and is served on its own port
-        locally (see frontend/README.md), so every browser call to the API is
-        cross-origin even on a laptop.
-        """
-        if self.is_prod:
-            return None
-        return r"http://(localhost|127\.0\.0\.1)(:\d+)?"
+        """Unused: cors_origins covers both modes. Kept for explicitness."""
+        return None
 
     # ---- Validation -------------------------------------------------------
 

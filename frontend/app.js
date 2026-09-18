@@ -22,9 +22,52 @@
   const ACCESS_KEY_STORAGE = "kria_access_key";
 
   /* Backend origin, without a trailing slash. Empty means same-origin. */
-  const API_BASE_URL = String(
-    (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || ""
-  ).replace(/\/+$/, "");
+  const API_BASE_URL = resolveApiBaseUrl();
+
+  function resolveApiBaseUrl() {
+    const configured = String(
+      (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL) || ""
+    ).replace(/\/+$/, "");
+    if (!configured) return "";
+
+    /* Local-development convenience. config.js ships pointing at
+       http://localhost:8000, but the page itself may be served from a
+       different host — http://0.0.0.0:5173, or a LAN IP when testing from a
+       phone. A loopback address in that situation means "the machine running
+       the browser", which is the wrong machine. Re-point it at whatever host
+       served this page, keeping the backend's port.
+
+       Only loopback hostnames are rewritten, so a real deployment (where
+       API_BASE_URL is a remote host) is never touched. */
+    try {
+      const url = new URL(configured, location.href);
+      const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+      if (isLoopback && location.hostname && location.hostname !== url.hostname) {
+        url.hostname = location.hostname;
+        return url.origin;
+      }
+    } catch (e) {
+      /* Not parseable as a URL — use it as configured. */
+    }
+    return configured;
+  }
+
+  /* fetch() rejects with the same opaque TypeError whether the server is
+     down or the browser blocked the response for CORS, and the UI can only
+     say "could not reach the server". The console can say more. */
+  function logConnectionDiagnostics(err) {
+    const target = API_BASE_URL || location.origin;
+    console.error(
+      "[keyword-analyzer] Could not reach the API at " + target + ".\n" +
+        "  1. Is the backend running and listening there?\n" +
+        "  2. Does the backend allow this page's origin (" + location.origin +
+        ")? In MODE=prod that means ALLOWED_ORIGINS must contain it exactly.\n" +
+        "  3. Is API_BASE_URL in config.js correct?\n" +
+        "A CORS rejection shows up in the Network tab as a failed OPTIONS " +
+        "preflight, often with status 400.",
+      err
+    );
+  }
   const CLIENT_TIMEOUT_MS = 180000;
   const RUN_STAGE_SWITCH_SECONDS = 35;
   const MOCK_DELAY_MS = 6000;
@@ -606,9 +649,12 @@
       return;
     }
 
+    logConnectionDiagnostics(err);
     showError({
       title: "Connection problem",
-      message: "Could not reach the server. Check your connection and try again.",
+      message:
+        "Could not reach the server. Check that the backend is running, " +
+        "then see the browser console for details.",
       actionLabel: "Try again",
       onAction: () => runAnalysis(topic)
     });
@@ -713,7 +759,11 @@
       if (err instanceof ApiError) {
         showGateError((err.body && err.body.detail) || "Invalid username or password.");
       } else {
-        showGateError("Could not reach the server. Check your connection and try again.");
+        logConnectionDiagnostics(err);
+        showGateError(
+          "Could not reach the server. Check that the backend is running, " +
+            "then see the browser console for details."
+        );
       }
       el.gatePassword.value = "";
       el.gatePassword.focus();

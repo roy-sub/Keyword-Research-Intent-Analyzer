@@ -251,10 +251,16 @@ def test_prod_requires_api_key_and_allowed_origins():
     assert any("ALLOWED_ORIGINS" in m for m in missing)
 
 
-def test_dev_mode_allows_localhost_origins():
+def test_dev_mode_allows_any_origin():
+    """Dev must not reject a preflight over which local host name was typed."""
     settings = Settings(ADMIN_PASSWORD="pw", GEMINI_API_KEY="key")
-    assert settings.cors_origin_regex is not None
     assert not settings.is_prod
+    assert settings.cors_origins == ["*"]
+
+
+def test_prod_mode_allows_only_the_configured_origins():
+    settings = prod_settings()
+    assert settings.cors_origins == [PROD_ORIGIN]
 
 
 def test_complete_config_validates():

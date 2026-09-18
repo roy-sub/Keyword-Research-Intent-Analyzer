@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import app.main as main
 from app.rate_limit import RateLimiter
 from app.suggest.base import SourceResult
@@ -290,3 +292,65 @@ def test_no_static_files_are_served(client):
     test_client, _p, _a = client
     for path in ("/index.html", "/app.js", "/styles.css", "/config.js"):
         assert test_client.get(path).status_code == 404, path
+
+
+# ---------------------------------------------------------------------------
+# Dev CORS
+#
+# Regression guard. `python3 -m http.server` announces itself as
+# "Serving HTTP on 0.0.0.0", so the frontend is commonly opened at
+# http://0.0.0.0:5173. A localhost-only dev allowlist rejected that preflight
+# with a 400, and the UI reported it as "Could not reach the server" — which
+# reads like wrong credentials rather than a CORS problem.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://0.0.0.0:5173",
+        "http://192.168.1.50:5173",
+        "http://penguin.linux.test:5173",
+    ],
+)
+def test_dev_accepts_preflight_from_any_local_origin(client, origin):
+    test_client, _p, _a = client
+    response = test_client.options(
+        "/api/login",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    assert response.status_code == 200, f"{origin} preflight rejected"
+    assert "access-control-allow-origin" in response.headers
+
+
+@pytest.mark.parametrize("origin", ["http://0.0.0.0:5173", "http://192.168.1.50:5173"])
+def test_dev_login_succeeds_from_any_local_origin(client, origin):
+    test_client, _p, _a = client
+    response = test_client.post(
+        "/api/login",
+        json={"username": "admin", "password": "test-password"},
+        headers={"Origin": origin},
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] in (origin, "*")
+
+
+async def test_password_with_special_characters_round_trips():
+    """A password containing % and other punctuation must survive settings
+    parsing and compare_digest unchanged — `%` in particular looks like an
+    interpolation sigil and is worth pinning down."""
+    from app.auth import authenticate, get_session_store
+    from app.config import Settings
+
+    tricky = "5A7SopkUr%Nd$x#y!z"
+    settings = Settings(ADMIN_USERNAME="admin", ADMIN_PASSWORD=tricky, GEMINI_API_KEY="k")
+    assert settings.ADMIN_PASSWORD == tricky
+
+    token = await authenticate("admin", tricky, settings)
+    assert get_session_store().is_valid(token)

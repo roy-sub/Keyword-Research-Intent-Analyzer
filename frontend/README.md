@@ -73,6 +73,26 @@ That is all the configuration needed: `config.js` already points at
 > `npx serve`, VS Code Live Server — only the port matters, and only because
 > it has to differ from the backend's.
 
+`python3 -m http.server` prints *"Serving HTTP on 0.0.0.0 port 5173"*, so
+browsing to `http://0.0.0.0:5173` is a natural thing to do. That works:
+`MODE=dev` accepts any origin, and `app.js` re-points a loopback
+`API_BASE_URL` at whatever host served the page, so reaching the dev server
+from a phone on the same Wi-Fi works too.
+
+### If the sign-in says "Could not reach the server"
+
+That message covers every failure the browser reports opaquely, so it does
+**not** mean the password is wrong. In order:
+
+1. **Is the backend running?** `curl localhost:8000/api/health` should return
+   `{"status":"ok"}`.
+2. **Open the browser console.** A failed call logs the API URL it tried and
+   what to check.
+3. **Look at the backend log.** `OPTIONS /api/login ... 400` is a rejected
+   CORS preflight, not a credentials failure — in `MODE=prod` that means
+   `ALLOWED_ORIGINS` does not contain this page's origin.
+4. **Check `config.js`** actually names the backend's origin and port.
+
 ### Testing it end to end
 
 With both services running, open http://localhost:5173 and check:

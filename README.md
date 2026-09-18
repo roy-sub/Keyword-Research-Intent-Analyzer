@@ -99,8 +99,16 @@ Then open **http://localhost:5173** and sign in with the `ADMIN_USERNAME` and
 That works with no extra configuration:
 
 - `frontend/config.js` already points at `http://localhost:8000`;
-- the backend in `MODE=dev` accepts any `http://localhost:*` origin, so CORS
-  passes and the API key is not enforced.
+- the backend in `MODE=dev` accepts **any** origin, so it does not matter
+  whether you open `localhost:5173`, `127.0.0.1:5173`, `0.0.0.0:5173` (which
+  is what `python3 -m http.server` prints), or a LAN IP from your phone;
+- the API key is not enforced in dev.
+
+> If sign-in reports **"Could not reach the server"**, that is not a
+> credentials failure — the browser reports every network and CORS problem
+> identically. Check the browser console, which logs the API URL that was
+> tried, and the backend log: `OPTIONS /api/login ... 400` means a rejected
+> CORS preflight.
 
 The exact commands, including how to test each side, are in
 [backend/README.md](backend/README.md) and

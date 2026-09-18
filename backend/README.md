@@ -39,7 +39,7 @@ To use the UI as well, start the frontend in a second terminal — see
 ./.venv/bin/python -m pytest
 ```
 
-57 tests. All HTTP is mocked; nothing touches Google or Gemini, and no test
+66 tests. All HTTP is mocked; nothing touches Google or Gemini, and no test
 needs real credentials.
 
 Smoke-testing a running server by hand:
@@ -102,14 +102,16 @@ All read through `pydantic-settings` from the environment, falling back to
 
 |  | `dev` | `prod` |
 |---|---|---|
-| CORS | any `http://localhost:*` / `http://127.0.0.1:*` | exactly `ALLOWED_ORIGINS` |
+| CORS | any origin | exactly `ALLOWED_ORIGINS` |
 | `X-API-Key` | not enforced | required for callers outside `ALLOWED_ORIGINS` |
 | `/docs`, `/redoc`, `/openapi.json` | enabled | disabled (404) |
 | Logs | verbose, with module and line | concise |
 | Startup validation | `ADMIN_PASSWORD`, `GEMINI_API_KEY` | those plus `API_KEY`, `ALLOWED_ORIGINS` |
 
-Dev needs no CORS configuration: the frontend on any localhost port is
-accepted automatically.
+Dev needs no CORS configuration: **any** origin is accepted, so it does
+not matter whether you open the UI at `localhost`, `127.0.0.1`, `0.0.0.0`,
+or a LAN IP from your phone. Dev does not enforce the API key either, so an
+allowlist would buy nothing there. `MODE=prod` is strict.
 
 ### Access
 
@@ -343,7 +345,10 @@ service's host.
 
 > If the UI loads but every call fails with a CORS error, `ALLOWED_ORIGINS`
 > does not match the frontend's origin. The browser console names the origin
-> that was rejected — paste exactly that, scheme included.
+> that was rejected — paste exactly that, scheme included. A rejected CORS
+> preflight appears in the backend log as `OPTIONS /api/... 400`, and the UI
+> reports it as "Could not reach the server", which looks misleadingly like
+> a credentials problem. Check the log before suspecting the password.
 
 ---
 
