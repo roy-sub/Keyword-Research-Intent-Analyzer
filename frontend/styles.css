@@ -517,15 +517,7 @@ a:hover { text-decoration: underline; }
   padding: var(--s-11) var(--s-10);
   background: #101115; color: #fff;
 }
-/* hairline grid — structure, not decoration-for-its-own-sake */
-.gate__brand::before {
-  content: ""; position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(ellipse 80% 60% at 30% 40%, #000 20%, transparent 78%);
-}
+
 .gate__brand-mark { position: absolute; top: var(--s-11); left: var(--s-10); z-index: 1; }
 .gate__brand-inner {
   position: relative; z-index: 1;
@@ -774,20 +766,94 @@ a:hover { text-decoration: underline; }
   font-size: var(--fs-micro); font-weight: 560;
   letter-spacing: var(--tr-micro); text-transform: uppercase; color: var(--c-ink-3);
 }
-.empty__viz { display: none; }
-.empty__viz svg { width: 100%; height: auto; }
-.viz-prism { stroke: var(--c-ink-1); stroke-width: 1.4; stroke-linejoin: round; }
-.viz-beam { stroke: var(--c-ink-4); stroke-width: 1.4; stroke-dasharray: 2 5; stroke-linecap: round; }
-.viz-dot { fill: var(--c-accent); }
-.viz-ray { stroke-width: 2; stroke-linecap: round; }
-.viz-ray--seed       { stroke: var(--c-seed); }
-.viz-ray--alphabet   { stroke: var(--c-alphabet); }
-.viz-ray--question   { stroke: var(--c-question); }
-.viz-ray--commercial { stroke: var(--c-commercial); }
+.empty__viz { display: none; margin: 0; }
+
+/* -- Editorial caption plate ---------------------------------------------
+      Borrowed from print: a tracked-out metadata strip under the plate. It
+      earns its place by doubling as the intent-class legend. ------------- */
+.plate {
+  display: flex; align-items: center; gap: var(--s-3);
+  flex-wrap: wrap;
+  margin-top: var(--s-6); padding-top: var(--s-5);
+  border-top: 1px solid var(--c-line);
+  font-size: var(--fs-micro); font-weight: 560;
+  letter-spacing: var(--tr-micro); text-transform: uppercase;
+  color: var(--c-ink-3);
+}
+.plate__arrow { color: var(--c-ink-4); }
+.plate__spectrum { display: flex; flex-wrap: wrap; gap: var(--s-3) var(--s-5); margin-left: var(--s-2); }
+.plate__class { display: inline-flex; align-items: center; gap: var(--s-2); }
+.plate__class i { width: 6px; height: 6px; border-radius: 1px; flex: none; }
 
 @media (min-width: 60rem) {
-  .empty { grid-template-columns: 1.35fr 1fr; gap: var(--s-12); }
+  /* The plate is the hero here, so it takes the larger share of the grid. */
+  .empty { grid-template-columns: 1fr 1.22fr; gap: var(--s-11); align-items: center; }
   .empty__viz { display: block; }
+}
+
+/* ==========================================================================
+   8b. ASCII FIELDS
+
+   A character grid used as a design material. Applied only to expressive
+   surfaces — the empty state, the sign-in panel, the running state. It is
+   deliberately kept away from every data surface (metrics, keyword rows, the
+   intent-mix bar, the report), where precision is what is being read and a
+   character ramp would trade legibility for style.
+   ========================================================================== */
+
+.ascii { position: relative; width: 100%; overflow: hidden; }
+.ascii__layer {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px; line-height: 1.02; letter-spacing: 0;
+  white-space: pre;
+  user-select: none; pointer-events: none;
+  -webkit-font-smoothing: antialiased;
+}
+/* Layers stack over one grid; the first holds the box, the rest overlay it. */
+.ascii__layer + .ascii__layer { position: absolute; inset: 0; }
+
+/* The measuring probe must shrink to its own text, so it opts out of the
+   stacking rule above. Without this every grid measures as wide as the probe
+   string and the art collapses to a fixed column count. */
+.ascii__probe {
+  position: absolute !important;
+  inset: auto !important;
+  left: 0; top: 0;
+  width: auto !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ---- Prism: structure in ink, spectrum in the four class hues ---- */
+.ascii--prism { --ascii-size: clamp(9px, 1vw, 13px); }
+.ascii--prism .ascii__layer { font-size: var(--ascii-size); }
+.ascii--prism .ascii__layer--structure  { color: var(--c-ink-2); }
+.ascii--prism .ascii__layer--seed       { color: var(--c-seed); }
+.ascii--prism .ascii__layer--alphabet   { color: var(--c-alphabet); }
+.ascii--prism .ascii__layer--question   { color: var(--c-question); }
+.ascii--prism .ascii__layer--commercial { color: var(--c-commercial); }
+
+/* ---- Sign-in texture: paper grain, not art ---- */
+.ascii--texture {
+  position: absolute; inset: 0; z-index: 0;
+  overflow: hidden;
+}
+.ascii--texture .ascii__layer {
+  font-size: 12px; line-height: 1.18;
+  color: rgba(255, 255, 255, 0.5);
+  opacity: 0.13;
+}
+
+/* ---- Collection field: a wavefront that advances with the run ---- */
+.ascii--collect {
+  height: 52px; overflow: hidden;
+  margin: var(--s-5) 0 var(--s-4);
+  mask-image: linear-gradient(90deg, #000 80%, transparent 100%);
+}
+.ascii--collect .ascii__layer {
+  font-size: 10px; line-height: 1.05;
+  color: var(--c-accent); opacity: 0.7;
 }
 
 /* ==========================================================================

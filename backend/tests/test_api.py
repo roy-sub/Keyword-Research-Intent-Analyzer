@@ -198,12 +198,12 @@ def test_all_queries_failing_returns_502_and_refunds_quota(client, auth):
 def test_response_records_which_provider_produced_the_report(client, auth):
     test_client, _p, analyzer = client
     analyzer.provider = "openai"
-    analyzer.model = "gpt-6-astra"
+    analyzer.model = "gpt-5.4-mini"
     body = test_client.post(
         "/api/analyze", json={"topic": "villa rentals"}, headers=auth
     ).json()
     assert body["analysis_provider"] == "openai"
-    assert body["analysis_model"] == "gpt-6-astra"
+    assert body["analysis_model"] == "gpt-5.4-mini"
 
 
 def test_all_providers_failing_returns_502_with_one_reason_each(client, auth):
@@ -213,9 +213,9 @@ def test_all_providers_failing_returns_502_with_one_reason_each(client, auth):
 
     async def failing(topic, keywords):
         raise AllProvidersFailed([
-            ProviderFailure("anthropic", "Claude", "claude-opus-5", "No API key configured."),
-            ProviderFailure("openai", "OpenAI", "gpt-6-astra", "Rate limit reached or quota exhausted."),
-            ProviderFailure("gemini", "Gemini", "gemini-3.5-flash", "The API key was rejected or lacks access."),
+            ProviderFailure("anthropic", "Claude", "claude-sonnet-5", "No API key configured."),
+            ProviderFailure("openai", "OpenAI", "gpt-5.4-mini", "Rate limit reached or quota exhausted."),
+            ProviderFailure("gemini", "Gemini", "gemini-3.8-flash", "The API key was rejected or lacks access."),
         ])
 
     analyzer.analyse = failing

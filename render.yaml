@@ -65,15 +65,15 @@ services:
       - key: ANTHROPIC_API_KEY
         sync: false          # secret
       - key: ANTHROPIC_MODEL
-        value: claude-opus-5
+        value: claude-sonnet-5
       - key: OPENAI_API_KEY
         sync: false          # secret
       - key: OPENAI_MODEL
-        value: gpt-6-astra
+        value: gpt-5.4-mini
       - key: GEMINI_API_KEY
         sync: false          # secret
       - key: GEMINI_MODEL
-        value: gemini-3.5-flash
+        value: gemini-3.8-flash
 
       # ---- Collection ----
       - key: SUGGEST_LANG

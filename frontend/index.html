@@ -54,6 +54,8 @@
 <div id="gate-screen" class="gate">
 
   <aside class="gate__brand">
+    <div class="ascii ascii--texture" id="gate-texture" aria-hidden="true"></div>
+
     <div class="gate__brand-mark">
       <div class="lockup lockup--invert">
         <span class="lockup__mark">
@@ -213,6 +215,7 @@
           <span class="run-panel__elapsed"><span id="elapsed-value">0</span>s</span>
         </div>
         <p id="running-message" class="run-panel__stage"></p>
+        <div class="ascii ascii--collect" id="collect-field" aria-hidden="true"></div>
         <div class="progress" role="progressbar" aria-label="Estimated progress" aria-valuemin="0" aria-valuemax="100">
           <span id="run-progress" class="progress__fill"></span>
         </div>
@@ -251,17 +254,19 @@
         </div>
       </div>
 
-      <div class="empty__viz" aria-hidden="true">
-        <svg viewBox="0 0 264 180" fill="none">
-          <path d="M6 74h92" class="viz-beam"/>
-          <circle cx="104" cy="74" r="3.6" class="viz-dot"/>
-          <path d="M128 30 192 142H64z" class="viz-prism"/>
-          <path d="M156 74 252 44" class="viz-ray viz-ray--seed"/>
-          <path d="M156 74 252 64" class="viz-ray viz-ray--alphabet"/>
-          <path d="M156 74 252 84" class="viz-ray viz-ray--question"/>
-          <path d="M156 74 252 104" class="viz-ray viz-ray--commercial"/>
-        </svg>
-      </div>
+      <figure class="empty__viz">
+        <div class="ascii ascii--prism" id="prism-field" aria-hidden="true"></div>
+        <figcaption class="plate">
+          <span class="plate__step">One topic</span>
+          <span class="plate__arrow" aria-hidden="true">&rarr;</span>
+          <span class="plate__spectrum">
+            <span class="plate__class"><i class="mix__swatch mix__slice--seed"></i>Seed</span>
+            <span class="plate__class"><i class="mix__swatch mix__slice--alphabet"></i>Alphabet</span>
+            <span class="plate__class"><i class="mix__swatch mix__slice--question"></i>Question</span>
+            <span class="plate__class"><i class="mix__swatch mix__slice--commercial"></i>Commercial</span>
+          </span>
+        </figcaption>
+      </figure>
     </section>
 
     <!-- ---------- Results ---------- -->
@@ -437,6 +442,7 @@
   integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a"
   crossorigin="anonymous"
   onerror="window.__libLoadFailed = true"></script>
+<script src="ascii.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 </body>

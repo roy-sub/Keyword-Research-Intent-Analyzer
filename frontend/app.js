@@ -56,6 +56,7 @@
     runTimerId: null,
     timeoutId: null,
     elapsedSeconds: 0,
+    runProgress: 0,
     openMenu: null
   };
 
@@ -158,6 +159,9 @@
     errorActionBtn: $("error-action-btn"),
 
     emptyState: $("empty-state"),
+    prismField: $("prism-field"),
+    gateTexture: $("gate-texture"),
+    collectField: $("collect-field"),
 
     results: $("results"),
     cachedBadge: $("cached-badge"),
@@ -578,10 +582,13 @@
       const pct = Math.min(88, Math.round((elapsed / estimate) * 88));
       el.runProgress.style.width = pct + "%";
       el.runProgress.parentElement.setAttribute("aria-valuenow", String(pct));
+      state.runProgress = pct / 100;
     } else {
       el.runningMessage.textContent = "Reading search intent";
       el.runProgress.classList.add("progress__fill--indeterminate");
       el.runProgress.parentElement.removeAttribute("aria-valuenow");
+      /* The collection phase is done; let the field run out to full. */
+      state.runProgress = 1;
     }
   }
 
@@ -1401,10 +1408,61 @@
   });
 
   /* ------------------------------------------------------------------
+     ASCII FIELDS
+
+     Decorative only, and only on expressive surfaces. Each is aria-hidden;
+     nothing here carries meaning that the surrounding text does not already
+     state, so a browser that cannot run them loses nothing.
+     ------------------------------------------------------------------ */
+
+  function mountAsciiFields() {
+    if (!global_Ascii()) return;
+    const Ascii = global_Ascii();
+
+    if (el.prismField) {
+      Ascii.createField(el.prismField, {
+        layers: ["structure", "seed", "alphabet", "question", "commercial"],
+        sample: Ascii.prismSample,
+        /* Fewer, larger cells read as drawing; more, smaller cells read as
+           noise. 76 is the point where the prism still resolves. */
+        rows: (cols) => Math.max(20, Math.round(cols * 0.47)),
+        maxCols: 76
+      });
+    }
+
+    if (el.gateTexture) {
+      Ascii.createField(el.gateTexture, {
+        layers: ["grain"],
+        sample: Ascii.textureSample,
+        rows: (cols, box) => Math.max(20, Math.round(box.height / 14)),
+        maxCols: 300,
+        /* A slow drift needs far fewer frames than the prism, which keeps a
+           grid this large cheap. */
+        fps: 5
+      });
+    }
+
+    if (el.collectField) {
+      Ascii.createField(el.collectField, {
+        layers: ["wave"],
+        sample: Ascii.makeCollectSample(() => state.runProgress),
+        rows: () => 5,
+        maxCols: 340,
+        fps: 12
+      });
+    }
+  }
+
+  function global_Ascii() {
+    return typeof window !== "undefined" && window.Ascii ? window.Ascii : null;
+  }
+
+  /* ------------------------------------------------------------------
      INIT
      ------------------------------------------------------------------ */
 
   async function init() {
+    mountAsciiFields();
     if (window.__libLoadFailed || !librariesAvailable()) {
       el.libError.classList.remove("is-hidden");
     }

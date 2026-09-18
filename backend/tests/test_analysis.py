@@ -136,7 +136,7 @@ def test_provider_without_a_key_is_not_configured():
 
 @pytest.mark.asyncio
 async def test_claude_is_used_when_it_succeeds():
-    claude = StubProvider("anthropic", "claude-opus-5", result="# Report")
+    claude = StubProvider("anthropic", "claude-sonnet-5", result="# Report")
     openai_p = StubProvider("openai", result="wrong")
     gemini = StubProvider("gemini", result="wrong")
 
@@ -144,7 +144,7 @@ async def test_claude_is_used_when_it_succeeds():
 
     assert result.markdown == "# Report"
     assert result.provider == "anthropic"
-    assert result.model == "claude-opus-5"
+    assert result.model == "claude-sonnet-5"
     assert claude.calls == 1
     # the rest are never called
     assert openai_p.calls == 0 and gemini.calls == 0
@@ -153,13 +153,13 @@ async def test_claude_is_used_when_it_succeeds():
 @pytest.mark.asyncio
 async def test_falls_back_to_openai_when_claude_fails():
     claude = StubProvider("anthropic", error="The API key was rejected.")
-    openai_p = StubProvider("openai", "gpt-6-astra", result="# From OpenAI")
+    openai_p = StubProvider("openai", "gpt-5.4-mini", result="# From OpenAI")
     gemini = StubProvider("gemini", result="wrong")
 
     result = await AnalysisChain(make_settings(), [claude, openai_p, gemini]).analyse("t", ["k"])
 
     assert result.provider == "openai"
-    assert result.model == "gpt-6-astra"
+    assert result.model == "gpt-5.4-mini"
     assert result.markdown == "# From OpenAI"
     assert gemini.calls == 0
 
@@ -168,7 +168,7 @@ async def test_falls_back_to_openai_when_claude_fails():
 async def test_falls_through_to_gemini_when_both_fail():
     claude = StubProvider("anthropic", error="The account has insufficient credit.")
     openai_p = StubProvider("openai", error="Rate limit reached or quota exhausted.")
-    gemini = StubProvider("gemini", "gemini-3.5-flash", result="# From Gemini")
+    gemini = StubProvider("gemini", "gemini-3.8-flash", result="# From Gemini")
 
     result = await AnalysisChain(make_settings(), [claude, openai_p, gemini]).analyse("t", ["k"])
 
@@ -205,9 +205,9 @@ async def test_a_hanging_provider_times_out_and_the_chain_continues():
 
 @pytest.mark.asyncio
 async def test_all_failed_reports_one_reason_per_provider():
-    claude = StubProvider("anthropic", "claude-opus-5", configured=False)
-    openai_p = StubProvider("openai", "gpt-6-astra", error="Rate limit reached or quota exhausted.")
-    gemini = StubProvider("gemini", "gemini-3.5-flash", error="The API key was rejected or lacks access.")
+    claude = StubProvider("anthropic", "claude-sonnet-5", configured=False)
+    openai_p = StubProvider("openai", "gpt-5.4-mini", error="Rate limit reached or quota exhausted.")
+    gemini = StubProvider("gemini", "gemini-3.8-flash", error="The API key was rejected or lacks access.")
 
     with pytest.raises(AllProvidersFailed) as excinfo:
         await AnalysisChain(make_settings(), [claude, openai_p, gemini]).analyse("t", ["k"])
@@ -217,7 +217,7 @@ async def test_all_failed_reports_one_reason_per_provider():
     assert failures[0].reason == "No API key configured."
     assert failures[1].reason == "Rate limit reached or quota exhausted."
     assert failures[2].reason == "The API key was rejected or lacks access."
-    assert [f.model for f in failures] == ["claude-opus-5", "gpt-6-astra", "gemini-3.5-flash"]
+    assert [f.model for f in failures] == ["claude-sonnet-5", "gpt-5.4-mini", "gemini-3.8-flash"]
 
 
 @pytest.mark.asyncio
@@ -253,7 +253,7 @@ async def test_no_credential_ever_appears_in_a_failure_reason():
 async def test_anthropic_maps_auth_error_to_a_clean_reason(monkeypatch):
     import anthropic
 
-    provider = AnthropicProvider("k", "claude-opus-5", 1.0)
+    provider = AnthropicProvider("k", "claude-sonnet-5", 1.0)
 
     class FakeMessages:
         async def create(self, **kwargs):
@@ -270,7 +270,7 @@ async def test_anthropic_maps_auth_error_to_a_clean_reason(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_anthropic_refusal_is_reported_as_a_decline():
-    provider = AnthropicProvider("k", "claude-opus-5", 1.0)
+    provider = AnthropicProvider("k", "claude-sonnet-5", 1.0)
 
     class FakeMessages:
         async def create(self, **kwargs):
@@ -284,7 +284,7 @@ async def test_anthropic_refusal_is_reported_as_a_decline():
 
 @pytest.mark.asyncio
 async def test_anthropic_reads_text_blocks_and_ignores_thinking():
-    provider = AnthropicProvider("k", "claude-opus-5", 1.0)
+    provider = AnthropicProvider("k", "claude-sonnet-5", 1.0)
     blocks = [
         type("B", (), {"type": "thinking", "thinking": "..."})(),
         type("B", (), {"type": "text", "text": "## 1. Search Intent Classification"})(),
@@ -300,7 +300,7 @@ async def test_anthropic_reads_text_blocks_and_ignores_thinking():
 
 @pytest.mark.asyncio
 async def test_openai_empty_output_is_an_error():
-    provider = OpenAIProvider("k", "gpt-6-astra", 1.0)
+    provider = OpenAIProvider("k", "gpt-5.4-mini", 1.0)
 
     class FakeResponses:
         async def create(self, **kwargs):
@@ -314,7 +314,7 @@ async def test_openai_empty_output_is_an_error():
 
 @pytest.mark.asyncio
 async def test_openai_reads_output_text():
-    provider = OpenAIProvider("k", "gpt-6-astra", 1.0)
+    provider = OpenAIProvider("k", "gpt-5.4-mini", 1.0)
 
     class FakeResponses:
         async def create(self, **kwargs):
@@ -326,7 +326,7 @@ async def test_openai_reads_output_text():
 
 @pytest.mark.asyncio
 async def test_gemini_blocked_response_is_an_error(monkeypatch):
-    provider = GeminiProvider("k", "gemini-3.5-flash", 1.0)
+    provider = GeminiProvider("k", "gemini-3.8-flash", 1.0)
 
     class FakeModels:
         async def generate_content(self, **kwargs):
@@ -366,7 +366,7 @@ def _api_error(code: int, message: str):
 )
 def test_gemini_reasons_are_classified_from_status(code, message, expected):
     from app.analysis import _gemini_reason
-    assert _gemini_reason(_api_error(code, message), "gemini-3.5-flash") == expected
+    assert _gemini_reason(_api_error(code, message), "gemini-3.8-flash") == expected
 
 
 def test_gemini_404_names_the_model():
@@ -378,5 +378,5 @@ def test_gemini_404_names_the_model():
 def test_gemini_reason_never_echoes_the_upstream_message():
     from app.analysis import _gemini_reason
     secret = "AIzaSyLEAKEDKEY123"
-    reason = _gemini_reason(_api_error(400, f"API key not valid: {secret}"), "gemini-3.5-flash")
+    reason = _gemini_reason(_api_error(400, f"API key not valid: {secret}"), "gemini-3.8-flash")
     assert secret not in reason

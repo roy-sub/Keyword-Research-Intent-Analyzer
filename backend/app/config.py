@@ -54,13 +54,13 @@ class Settings(BaseSettings):
     MAX_KEYWORDS_IN_PROMPT: int = 600
 
     ANTHROPIC_API_KEY: str = ""
-    ANTHROPIC_MODEL: str = "claude-opus-5"
+    ANTHROPIC_MODEL: str = "claude-sonnet-5"
 
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-6-astra"
+    OPENAI_MODEL: str = "gpt-5.4-mini"
 
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.5-flash"
+    GEMINI_MODEL: str = "gemini-3.8-flash"
 
     # ---- Collection -------------------------------------------------------
     SUGGEST_LANG: str = "en"

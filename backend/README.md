@@ -140,16 +140,17 @@ fails if all three are empty. An unset provider is skipped, not an error.
 | `AI_TIMEOUT_SECONDS` | `120` | Per-attempt timeout, applied to each provider separately. |
 | `MAX_KEYWORDS_IN_PROMPT` | `600` | Prompt cap; truncation is noted in the prompt itself. |
 | `ANTHROPIC_API_KEY` | — | Claude. https://console.anthropic.com/settings/keys |
-| `ANTHROPIC_MODEL` | `claude-opus-5` | Flagship. Cheaper: `claude-sonnet-5`, `claude-haiku-4-5`. |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5` | Balanced tier. Stronger: `claude-opus-5`. Cheaper: `claude-haiku-4-5`. |
 | `OPENAI_API_KEY` | — | OpenAI. https://platform.openai.com/api-keys |
-| `OPENAI_MODEL` | `gpt-6-astra` | Flagship. Cheaper: `gpt-5.6-terra`, `gpt-5.6-luna`. |
+| `OPENAI_MODEL` | `gpt-5.4-mini` | Compact tier, 400K context. Stronger: `gpt-5.4`, `gpt-6-astra`. |
 | `GEMINI_API_KEY` | — | Gemini. https://aistudio.google.com/apikey |
-| `GEMINI_MODEL` | `gemini-3.5-flash` | `gemini-2.5-flash` is being retired — do not use it. |
+| `GEMINI_MODEL` | `gemini-3.8-flash` | Most capable Flash model. `gemini-2.5-flash` is retiring — do not use it. |
 
-> **Cost.** The two defaults are flagship-tier models. If this runs often,
-> switch `ANTHROPIC_MODEL` and `OPENAI_MODEL` to the cheaper tiers above —
-> a config change, no code change. Note that a cached run costs nothing at
-> all, and the chain only reaches the second provider when the first fails.
+> **Cost.** All three defaults are mid-tier models chosen to balance quality
+> against price for a once-per-topic analysis. Move up or down a tier with the
+> alternatives above — a config change, no code change. A cached run costs
+> nothing at all, and the chain only reaches the second provider when the
+> first fails.
 
 **How the fallback behaves.** Each provider's SDK already retries connection
 errors, 429s and 5xx once; beyond that there is no extra retry loop, because
@@ -274,7 +275,7 @@ Request: `{"topic": "luxury villa rentals"}`
   ],
   "analysis_markdown": "## 1. Search Intent Classification\n...",
   "analysis_provider": "anthropic",
-  "analysis_model": "claude-opus-5"
+  "analysis_model": "claude-sonnet-5"
 }
 ```
 
