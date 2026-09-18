@@ -39,6 +39,8 @@
     <g id="i-chevron-right"><path d="m8 5.6 4.4 4.4L8 14.4"/></g>
     <g id="i-hash"><path d="M7.6 3.6 6 16.4M14 3.6l-1.6 12.8M3.8 7.4h12.6M3.2 12.6h12.6"/></g>
     <g id="i-lock"><rect x="4" y="8.6" width="12" height="8.4" rx="1.8"/><path d="M6.8 8.6V6.4a3.2 3.2 0 0 1 6.4 0v2.2"/></g>
+    <g id="i-eye"><path d="M1.8 10S4.9 4.6 10 4.6 18.2 10 18.2 10 15.1 15.4 10 15.4 1.8 10 1.8 10z"/><circle cx="10" cy="10" r="2.6"/></g>
+    <g id="i-eye-off"><path d="M8.2 5a6.9 6.9 0 0 1 1.8-.2c5.1 0 8.2 5.2 8.2 5.2a13.7 13.7 0 0 1-2.4 2.9M5.3 6.2A13.7 13.7 0 0 0 1.8 10s3.1 5.2 8.2 5.2c1.6 0 3-.5 4.2-1.2"/><path d="M8.3 8.3a2.4 2.4 0 0 0 3.4 3.4M3.2 3.2l13.6 13.6"/></g>
     <g id="i-globe"><circle cx="10" cy="10" r="7.4"/><path d="M2.6 10h14.8M10 2.6c1.9 2 3 4.6 3 7.4s-1.1 5.4-3 7.4c-1.9-2-3-4.6-3-7.4s1.1-5.4 3-7.4z"/></g>
     <g id="i-target"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="2.6"/></g>
   </defs>
@@ -110,7 +112,12 @@
 
         <div class="field">
           <label class="label" for="gate-password">Password</label>
-          <input class="input" id="gate-password" name="password" type="password" autocomplete="current-password" required>
+          <div class="field__wrap">
+            <input class="input input--has-affix" id="gate-password" name="password" type="password" autocomplete="current-password" required>
+            <button id="gate-password-toggle" type="button" class="field__affix" aria-label="Show password" aria-pressed="false" title="Show password" tabindex="0">
+              <svg class="icon" viewBox="0 0 20 20" aria-hidden="true"><use id="gate-password-icon" href="#i-eye"/></svg>
+            </button>
+          </div>
         </div>
 
         <div id="gate-error" class="form-error is-hidden" role="alert">
@@ -158,7 +165,7 @@
             <span class="account__avatar" id="account-initial">A</span>
             <svg class="icon account__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
           </button>
-          <div id="account-menu" class="menu__panel is-hidden" role="menu" aria-labelledby="account-btn">
+          <div id="account-menu" class="menu__panel menu__panel--right is-hidden" role="menu" aria-labelledby="account-btn">
             <div class="menu__head">
               <span class="menu__label">Signed in as</span>
               <span class="menu__value" id="account-name">admin</span>
@@ -187,12 +194,18 @@
       </div>
 
       <div class="query__seg query__seg--market">
-        <label class="query__label" for="market-select">Market</label>
+        <span class="query__label" id="market-label">Market</span>
         <div class="query__select-row">
           <svg class="icon query__icon" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-globe"/></svg>
-          <select id="market-select" class="query__select" name="market"
-                  aria-describedby="market-hint"></select>
-          <svg class="icon query__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+          <div class="market">
+            <button id="market-btn" type="button" class="market__btn" aria-haspopup="listbox"
+                    aria-expanded="false" aria-controls="market-list"
+                    aria-labelledby="market-label market-value" aria-describedby="market-hint">
+              <span id="market-value" class="market__value"></span>
+              <svg class="icon query__chev" viewBox="0 0 20 20" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+            </button>
+            <div id="market-list" class="market__panel is-hidden" role="listbox" aria-labelledby="market-label"></div>
+          </div>
         </div>
       </div>
 

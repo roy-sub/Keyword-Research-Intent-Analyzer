@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     # language without changing those words silently wastes ten of the 37
     # queries. See app/markets.py.
     ENABLED_MARKETS: str = "en-US,de-CH"
-    DEFAULT_MARKET: str = "en-US"
+    DEFAULT_MARKET: str = "de-CH"
 
     # ---- Collection -------------------------------------------------------
     SUGGEST_DELAY_SECONDS: float = 1.0

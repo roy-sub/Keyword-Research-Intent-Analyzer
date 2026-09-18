@@ -82,7 +82,7 @@ services:
       - key: ENABLED_MARKETS
         value: en-US,de-CH
       - key: DEFAULT_MARKET
-        value: en-US
+        value: de-CH
 
       # ---- Collection ----
       - key: SUGGEST_DELAY_SECONDS

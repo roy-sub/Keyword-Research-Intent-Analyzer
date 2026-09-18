@@ -165,7 +165,7 @@ upstream body, a traceback, or anything that could carry a credential.
 | Variable | Default | Purpose |
 |---|---|---|
 | `ENABLED_MARKETS` | `en-US,de-CH` | Which locales the picker offers. Unknown codes are dropped rather than raising. |
-| `DEFAULT_MARKET` | `en-US` | Which one is preselected; switchable per run in the UI. |
+| `DEFAULT_MARKET` | `de-CH` | Which one is preselected; switchable per run in the UI. |
 | `SUGGEST_DELAY_SECONDS` | `1.0` | Delay between consecutive requests, plus random jitter. |
 | `SUGGEST_TIMEOUT_SECONDS` | `5.0` | Per-request timeout. |
 | `SUGGEST_MAX_RETRIES` | `2` | Retries per query on timeout / 429 / 5xx. |

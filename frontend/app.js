@@ -32,7 +32,7 @@
     retry_after_seconds: 0,
     request_delay_seconds: 1.0,
     expected_queries: 37,
-    default_market: "en-US",
+    default_market: "de-CH",
     markets: [
       {
         code: "en-US", label: "English \u00b7 United States", lang: "en", country: "us",
@@ -149,6 +149,8 @@
     gateForm: $("gate-form"),
     gateUsername: $("gate-username"),
     gatePassword: $("gate-password"),
+    gatePasswordToggle: $("gate-password-toggle"),
+    gatePasswordIcon: $("gate-password-icon"),
     gateError: $("gate-error"),
     gateErrorText: $("gate-error-text"),
     gateSubmit: $("gate-submit"),
@@ -168,7 +170,9 @@
     topicErrorText: $("topic-error-text"),
     runBtn: $("run-btn"),
     mockBanner: $("mock-banner"),
-    marketSelect: $("market-select"),
+    marketBtn: $("market-btn"),
+    marketValue: $("market-value"),
+    marketList: $("market-list"),
     marketHint: $("market-hint"),
     metaQueries: $("meta-queries"),
     metaPacing: $("meta-pacing"),
@@ -545,8 +549,24 @@
     el.app.classList.add("is-hidden");
     el.gateScreen.classList.remove("is-hidden");
     el.gatePassword.value = "";
+    hidePassword();
     if (message) showGateError(message);
     setTimeout(() => el.gateUsername.focus(), 0);
+  }
+
+  /* The password starts hidden and is revealed only while the eye is on, so
+     a shoulder-surfer sees it no longer than the user chooses to. */
+  function setPasswordShown(shown) {
+    const label = shown ? "Hide password" : "Show password";
+    el.gatePassword.type = shown ? "text" : "password";
+    el.gatePasswordToggle.setAttribute("aria-pressed", shown ? "true" : "false");
+    el.gatePasswordToggle.setAttribute("aria-label", label);
+    el.gatePasswordToggle.title = label;
+    el.gatePasswordIcon.setAttribute("href", shown ? "#i-eye-off" : "#i-eye");
+  }
+
+  function hidePassword() {
+    setPasswordShown(false);
   }
 
   /* The stored access key is a server-issued session token, never the
@@ -635,23 +655,74 @@
 
   function renderMarkets() {
     const markets = availableMarkets();
+    el.marketList.innerHTML = "";
     if (!markets.length) {
-      el.marketSelect.disabled = true;
+      el.marketBtn.disabled = true;
       return;
     }
 
     const wanted = preferredMarket(markets);
-    el.marketSelect.innerHTML = "";
     markets.forEach((m) => {
-      const option = document.createElement("option");
-      option.value = m.code;
-      option.textContent = m.label;
-      el.marketSelect.appendChild(option);
+      el.marketList.appendChild(marketOption(m));
     });
-    el.marketSelect.value = wanted;
-    el.marketSelect.disabled = markets.length < 2;
+    el.marketBtn.disabled = markets.length < 2;
     state.market = wanted;
+    syncMarketPicker();
     renderMarketHint();
+  }
+
+  /* One option row. A button rather than a div so it is focusable and
+     clickable without re-implementing either. */
+  function marketOption(market) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = "market__option";
+    option.setAttribute("role", "option");
+    option.dataset.code = market.code;
+
+    const label = document.createElement("span");
+    label.textContent = market.label;
+    option.appendChild(label);
+
+    /* Built in the SVG namespace explicitly: createElement would produce an
+       HTML element of the same name, which renders nothing. */
+    const svgNs = "http://www.w3.org/2000/svg";
+    const icon = document.createElementNS(svgNs, "svg");
+    icon.setAttribute("class", "icon market__tick");
+    icon.setAttribute("viewBox", "0 0 20 20");
+    icon.setAttribute("aria-hidden", "true");
+    const use = document.createElementNS(svgNs, "use");
+    use.setAttribute("href", "#i-check");
+    icon.appendChild(use);
+    option.appendChild(icon);
+
+    option.addEventListener("click", () => {
+      closeMenu();
+      if (market.code !== state.market) setMarket(market.code);
+      syncMarketPicker();
+      el.marketBtn.focus();
+    });
+    return option;
+  }
+
+  /* Mirrors state.market onto the trigger label and the option ticks. */
+  function syncMarketPicker() {
+    const market = currentMarket();
+    el.marketValue.textContent = market ? market.label : "";
+    Array.prototype.forEach.call(el.marketList.children, (option) => {
+      option.setAttribute("aria-selected", option.dataset.code === state.market ? "true" : "false");
+    });
+  }
+
+  /* The query bar clips its own overflow, so the panel is fixed-positioned
+     and placed against the trigger, kept clear of the viewport edges. */
+  function positionMarketPanel() {
+    const rect = el.marketBtn.getBoundingClientRect();
+    const width = Math.max(rect.width, 224);
+    const left = Math.min(rect.left, window.innerWidth - width - 12);
+    el.marketList.style.minWidth = width + "px";
+    el.marketList.style.left = Math.max(12, left) + "px";
+    el.marketList.style.top = (rect.bottom + 8) + "px";
   }
 
   function availableMarkets() {
@@ -1538,6 +1609,11 @@
   el.gateUsername.addEventListener("input", clearGateError);
   el.gatePassword.addEventListener("input", clearGateError);
 
+  el.gatePasswordToggle.addEventListener("click", () => {
+    setPasswordShown(el.gatePassword.type !== "text");
+    el.gatePassword.focus();
+  });
+
   el.accountBtn.addEventListener("click", () => toggleMenu(el.accountBtn, el.accountMenu));
 
   el.logoutBtn.addEventListener("click", async () => {
@@ -1627,8 +1703,21 @@
     flashButton(el.copyReportBtn, ok, "Copied", "Failed");
   });
 
-  el.marketSelect.addEventListener("change", () => {
-    setMarket(el.marketSelect.value);
+  el.marketBtn.addEventListener("click", () => {
+    if (state.openMenu && state.openMenu.panel === el.marketList) {
+      closeMenu();
+      return;
+    }
+    positionMarketPanel();
+    openMenu(el.marketBtn, el.marketList);
+  });
+
+  /* The panel is placed once, against where the trigger was — so it closes
+     rather than drifting when the page moves under it. */
+  ["resize", "scroll"].forEach((event) => {
+    window.addEventListener(event, () => {
+      if (state.openMenu && state.openMenu.panel === el.marketList) closeMenu();
+    }, true);
   });
 
   el.newRunBtn.addEventListener("click", () => {

@@ -79,8 +79,8 @@ def test_both_markets_are_enabled_by_default():
 
 
 def test_default_market_is_preselected():
-    assert make_settings().default_market.code == "en-US"
-    assert make_settings(DEFAULT_MARKET="de-CH").default_market.code == "de-CH"
+    assert make_settings().default_market.code == "de-CH"
+    assert make_settings(DEFAULT_MARKET="en-US").default_market.code == "en-US"
 
 
 def test_a_requested_market_is_honoured():
@@ -90,9 +90,9 @@ def test_a_requested_market_is_honoured():
 def test_an_unknown_or_missing_market_falls_back_instead_of_failing():
     """An old bookmark or a stale client must not be able to fail a run."""
     settings = make_settings()
-    assert settings.resolve_market("zz-ZZ").code == "en-US"
-    assert settings.resolve_market("").code == "en-US"
-    assert settings.resolve_market(None).code == "en-US"
+    assert settings.resolve_market("zz-ZZ").code == "de-CH"
+    assert settings.resolve_market("").code == "de-CH"
+    assert settings.resolve_market(None).code == "de-CH"
 
 
 def test_a_market_that_is_not_enabled_is_refused_and_falls_back():
@@ -145,7 +145,7 @@ def test_status_advertises_both_markets(client, auth):
 
     codes = [m["code"] for m in body["markets"]]
     assert codes == ["en-US", "de-CH"]
-    assert body["default_market"] == "en-US"
+    assert body["default_market"] == "de-CH"
 
     german = next(m for m in body["markets"] if m["code"] == "de-CH")
     assert german["question_modifiers"] == ["wer", "wie", "was", "wo", "warum", "welche"]
@@ -179,8 +179,8 @@ def test_omitting_the_market_uses_the_default(client, auth):
     test_client, provider, _analyzer = client
     body = test_client.post("/api/analyze", json={"topic": "villa"}, headers=auth).json()
 
-    assert provider.last_market.code == "en-US"
-    assert body["market"] == "en-US"
+    assert provider.last_market.code == "de-CH"
+    assert body["market"] == "de-CH"
 
 
 def test_an_unknown_market_falls_back_rather_than_400ing(client, auth):
@@ -190,7 +190,7 @@ def test_an_unknown_market_falls_back_rather_than_400ing(client, auth):
     )
 
     assert response.status_code == 200
-    assert response.json()["market"] == "en-US"
+    assert response.json()["market"] == "de-CH"
 
 
 def test_two_markets_do_not_share_a_cached_result(client, auth):

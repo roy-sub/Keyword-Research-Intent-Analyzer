@@ -142,7 +142,7 @@ never a key.
 | Variable | Default | Notes |
 |---|---|---|
 | `ENABLED_MARKETS` | `en-US,de-CH` | Which locales the picker offers. Unknown codes are dropped, not fatal. |
-| `DEFAULT_MARKET` | `en-US` | Preselected; anyone can switch per run in the UI. |
+| `DEFAULT_MARKET` | `de-CH` | Preselected; anyone can switch per run in the UI. |
 
 A market is a language, a country **and** the question and buying words that
 suit them — all three move together. Setting `hl=de` while still firing
